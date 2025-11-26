@@ -34,7 +34,7 @@ export default function PollutantBreakdown({
   const pollutants: PollutantInfo[] = [
     {
       name: 'PM2.5',
-      value: pm25,
+      value: pm25 ?? null,
       unit: 'µg/m³',
       safeLimit: 35,
       description: 'Fine particulate matter (2.5 micrometers)',
@@ -43,7 +43,7 @@ export default function PollutantBreakdown({
     },
     {
       name: 'PM10',
-      value: pm10,
+      value: pm10 ?? null,
       unit: 'µg/m³',
       safeLimit: 50,
       description: 'Coarse particulate matter (10 micrometers)',
@@ -52,7 +52,7 @@ export default function PollutantBreakdown({
     },
     {
       name: 'O₃',
-      value: o3,
+      value: o3 ?? null,
       unit: 'ppb',
       safeLimit: 100,
       description: 'Ozone',
@@ -61,7 +61,7 @@ export default function PollutantBreakdown({
     },
     {
       name: 'NO₂',
-      value: no2,
+      value: no2 ?? null,
       unit: 'ppb',
       safeLimit: 100,
       description: 'Nitrogen Dioxide',
@@ -70,7 +70,7 @@ export default function PollutantBreakdown({
     },
     {
       name: 'SO₂',
-      value: so2,
+      value: so2 ?? null,
       unit: 'ppb',
       safeLimit: 75,
       description: 'Sulfur Dioxide',
@@ -79,7 +79,7 @@ export default function PollutantBreakdown({
     },
     {
       name: 'CO',
-      value: co,
+      value: co ?? null,
       unit: 'ppm',
       safeLimit: 9,
       description: 'Carbon Monoxide',
