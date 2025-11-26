@@ -296,9 +296,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Default to '/' if on auth callback page or root
     const currentPath = window.location.pathname;
     const nextPath = currentPath === '/auth/callback' || currentPath === '/' ? '/' : currentPath;
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+    
+    // Use NEXT_PUBLIC_APP_URL if available (for production), otherwise use current origin
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const redirectTo = `${appUrl}/auth/callback?next=${encodeURIComponent(nextPath)}`;
     
     console.log('[Sign In] Current path:', currentPath, '→ Redirecting to:', nextPath);
+    console.log('[Sign In] Using app URL:', appUrl);
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
