@@ -490,41 +490,75 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
       try {
         console.log('🔍 Starting report query...');
         
-        // Try direct Supabase query first
+        // ALWAYS use API route first (more reliable, bypasses RLS)
         let data: any[] | null = null;
         let error: any = null;
         
-        if (supabase) {
-          let query = supabase
-            .from('reports')
-            .select('id, title, type, description, status, location, created_at, is_anonymous')
-            .order('created_at', { ascending: false });
-
-          // PERMANENT FIX: Apply filters based on view, but default to showing ALL reports
-          if (activeApp === 'security' || dataView === 'cybersecurity_alerts') {
-            query = query.eq('type', 'cybersecurity');
-          } else if (dataView === 'normal_alerts') {
-            query = query.neq('type', 'cybersecurity');
-          }
-          // For 'all_alerts' or any other view, show ALL reports (no filter)
-
-          console.log('🔍 Executing direct Supabase query...');
-          console.log('🔍 Query details:', {
-            table: 'reports',
-            filters: {
-              activeApp,
-              dataView,
-              typeFilter: activeApp === 'security' || dataView === 'cybersecurity_alerts' ? 'cybersecurity' : 
-                         dataView === 'normal_alerts' ? 'not cybersecurity' : 'all'
-            }
-          });
+        // Use API route with service role key (bypasses RLS)
+        try {
+          const apiUrl = new URL('/api/reports/public', window.location.origin);
+          apiUrl.searchParams.set('activeApp', activeApp || '');
+          apiUrl.searchParams.set('dataView', dataView || '');
+          apiUrl.searchParams.set('limit', '500');
           
-          const result = await query.limit(500);
-          data = result.data;
-          error = result.error;
+          console.log('🔄 Fetching reports from API route:', apiUrl.toString());
+          const response = await fetch(apiUrl.toString());
+          
+          const responseText = await response.text();
+          let apiResult: any;
+          
+          try {
+            apiResult = JSON.parse(responseText);
+          } catch (parseError) {
+            console.error('❌ Failed to parse API response:', responseText);
+            throw new Error(`API route returned invalid JSON: ${response.status} ${response.statusText}`);
+          }
+          
+          if (!response.ok) {
+            console.error('❌ API route error response:', apiResult);
+            throw new Error(apiResult.error || `API route returned ${response.status}: ${responseText}`);
+          }
+          
+          if (apiResult.success && apiResult.reports) {
+            console.log('✅ API route successful:', apiResult.count, 'reports');
+            console.log('📊 API route stats:', {
+              totalFetched: apiResult.totalFetched || apiResult.count,
+              validReports: apiResult.count,
+              filteredOut: apiResult.filteredOut || 0,
+            });
+            data = apiResult.reports;
+            error = null;
+          } else {
+            console.error('❌ API route returned invalid data structure:', apiResult);
+            throw new Error(apiResult.error || 'API route returned invalid data');
+          }
+        } catch (apiError: any) {
+          console.error('❌ API route failed:', apiError);
+          error = apiError;
+          
+          // Fallback: Try direct Supabase query
+          if (supabase) {
+            console.log('🔄 Trying direct Supabase query as fallback...');
+            let query = supabase
+              .from('reports')
+              .select('id, title, type, description, status, location, created_at, is_anonymous')
+              .order('created_at', { ascending: false })
+              .not('location', 'is', null);
+
+            // Apply filters based on view
+            if (activeApp === 'security' || dataView === 'cybersecurity_alerts') {
+              query = query.eq('type', 'cybersecurity');
+            } else if (dataView === 'normal_alerts') {
+              query = query.neq('type', 'cybersecurity');
+            }
+            
+            const result = await query.limit(500);
+            data = result.data;
+            error = result.error;
+          }
         }
 
-        // If direct query fails (likely RLS issue), use API route as fallback
+        // If both methods failed
         if (error || !data) {
           console.warn('⚠️ Direct Supabase query failed, trying API route fallback...');
           if (error) {
@@ -1190,17 +1224,42 @@ CREATE POLICY "Public can view all reports"
             // Filter and render valid markers
             const validMarkers = reportMarkers.filter((report) => {
               if (!report.position || !Array.isArray(report.position) || report.position.length !== 2) {
+                console.warn('⚠️ Invalid marker position:', report.id, report.position);
                 return false;
               }
               const [lat, lng] = report.position;
-              return typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+              const isValid = typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+              if (!isValid) {
+                console.warn('⚠️ Invalid marker coordinates:', report.id, { lat, lng });
+              }
+              return isValid;
             });
+            
+            console.log('📊 Marker validation:', {
+              total: reportMarkers.length,
+              valid: validMarkers.length,
+              invalid: reportMarkers.length - validMarkers.length
+            });
+            
+            if (validMarkers.length === 0 && reportMarkers.length > 0) {
+              console.error('❌ All markers filtered out as invalid!');
+              console.error('Sample marker:', reportMarkers[0]);
+              return (
+                <div className="absolute top-4 left-4 z-[1000] bg-red-500/90 text-white px-4 py-2 rounded-lg shadow-lg max-w-md">
+                  <p className="font-semibold">⚠️ Invalid Report Locations</p>
+                  <p className="text-sm mt-1">
+                    Reports found but locations are invalid. Check console for details.
+                  </p>
+                </div>
+              );
+            }
             
             if (validMarkers.length === 0) {
               return null;
             }
             
             console.log('✅✅✅ RENDERING', validMarkers.length, 'REPORT MARKERS ON MAP');
+            console.log('📍 First marker position:', validMarkers[0]?.position);
             
             return validMarkers.map((report) => (
                 <Marker 

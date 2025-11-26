@@ -1,7 +1,7 @@
 'use client';
 
 import AppWindow from '@/components/os/AppWindow';
-import { FileText, Users, TrendingUp, ShieldCheck, UserCircle, Bell, Megaphone, Wind } from 'lucide-react';
+import { FileText, Users, TrendingUp, ShieldCheck, UserCircle, Bell, Megaphone, Wind, Shield } from 'lucide-react';
 
 // Placeholder app components (will be replaced with actual apps)
 import ReportsApp from '@/components/apps/ReportsApp';
@@ -12,6 +12,7 @@ import ProfileApp from '@/components/apps/ProfileApp';
 import NotificationsApp from '@/components/apps/NotificationsApp';
 import AlertsApp from '@/components/apps/AlertsApp';
 import PollutionApp from '@/components/apps/PollutionApp';
+import AdminPanel from '@/components/apps/AdminPanel';
 
 export default function OSPage() {
   return (
@@ -52,6 +53,33 @@ export default function OSPage() {
         <SecurityApp />
       </AppWindow>
 
+      {/* Pollution App */}
+      <AppWindow
+        appId="pollution"
+        title="Pollution Monitor"
+        icon={<Wind className="w-5 h-5 text-cyan-500" />}
+      >
+        <PollutionApp />
+      </AppWindow>
+
+      {/* Admin Panel */}
+      <AppWindow
+        appId="admin"
+        title="Admin Panel"
+        icon={<Shield className="w-5 h-5 text-red-600" />}
+      >
+        <AdminPanel />
+      </AppWindow>
+
+      {/* Alerts App */}
+      <AppWindow
+        appId="alerts"
+        title="Public Alerts"
+        icon={<Megaphone className="w-5 h-5 text-orange-500" />}
+      >
+        <AlertsApp />
+      </AppWindow>
+
       {/* Profile App */}
       <AppWindow
         appId="profile"
@@ -68,24 +96,6 @@ export default function OSPage() {
         icon={<Bell className="w-5 h-5 text-windows-blue" />}
       >
         <NotificationsApp />
-      </AppWindow>
-
-      {/* Alerts App */}
-      <AppWindow
-        appId="alerts"
-        title="Public Alerts"
-        icon={<Megaphone className="w-5 h-5 text-orange-500" />}
-      >
-        <AlertsApp />
-      </AppWindow>
-
-      {/* Pollution App */}
-      <AppWindow
-        appId="pollution"
-        title="Pollution Monitor"
-        icon={<Wind className="w-5 h-5 text-cyan-500" />}
-      >
-        <PollutionApp />
       </AppWindow>
     </>
   );

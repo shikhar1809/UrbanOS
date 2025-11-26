@@ -51,6 +51,13 @@ export default function CommunityReportsList() {
 
       if (error) throw error;
 
+      // Filter out community reports that don't meet 50 upvote criteria
+      const validCommunityReports = (data || []).filter((cr: CommunityReport) => {
+        return cr.upvote_count >= 50;
+      });
+
+      console.log(`Filtered community reports: ${data?.length || 0} total, ${validCommunityReports.length} with 50+ upvotes`);
+
       // List of demo report titles
       const demoReportTitles = [
         'Large pothole on MG Road near Hazratganj crossing',
@@ -84,7 +91,7 @@ export default function CommunityReportsList() {
       
       // Fetch creator info separately for each report (more reliable)
       const reportsWithCreators = await Promise.all(
-        (data || []).map(async (cr: any, index: number) => {
+        (validCommunityReports || []).map(async (cr: any, index: number) => {
           const report = cr.report;
           if (report) {
             // Check if this is a demo report
@@ -339,10 +346,10 @@ export default function CommunityReportsList() {
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-medium border ${
                         cr.status === 'active' 
-                          ? 'bg-yellow-500/30 text-white border-yellow-400/50'
+                          ? 'bg-yellow-500 text-white border-yellow-600'
                           : cr.status === 'resolved'
-                          ? 'bg-green-500/30 text-white border-green-400/50'
-                          : 'bg-red-500/30 text-white border-red-400/50'
+                          ? 'bg-green-500 text-white border-green-600'
+                          : 'bg-red-500 text-white border-red-600'
                       } flex items-center gap-1`}
                     >
                       <StatusIcon className="w-3 h-3" />

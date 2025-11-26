@@ -38,6 +38,18 @@ export default function CommunityReportDetail({
   // Check if this is demo data (demo IDs don't follow UUID format)
   const isDemoData = communityReportId.startsWith('demo-') || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(communityReportId);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('CommunityReportDetail Debug:', {
+      userId: user?.id,
+      curatorId,
+      isCurator,
+      isDemoData,
+      communityReportId,
+      isAuthenticated: !!user,
+    });
+  }, [user?.id, curatorId, isCurator, isDemoData, communityReportId]);
+
   // Fetch curator information
   useEffect(() => {
     const fetchCuratorInfo = async () => {
@@ -63,7 +75,15 @@ export default function CommunityReportDetail({
   }, [curatorId]);
 
   const handleGenerateBriefDocument = async () => {
-    if (!isCurator) return;
+    if (!user) {
+      showToast('Please sign in to generate documents', 'error');
+      return;
+    }
+
+    if (isDemoData) {
+      showToast('Cannot generate documents for demo data', 'error');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -71,106 +91,82 @@ export default function CommunityReportDetail({
         method: 'POST',
       });
 
-      const responseText = await response.text();
-      let errorData: any = {};
-      let data: any = {};
-      
-      try {
-        if (!response.ok) {
-          errorData = JSON.parse(responseText);
-          throw new Error(errorData.error || `Failed to generate brief document: ${response.status} ${response.statusText}`);
-        }
-        
-        data = JSON.parse(responseText);
-        
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to generate brief document');
-        }
-        
-        setBriefDocumentGenerated(true);
-        
-        // Download the PDF
-        const link = document.createElement('a');
-        link.href = data.documentUrl;
-        link.download = data.fileName || 'community-report-brief.pdf';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        showToast(data.message || 'Brief document generated and downloaded!', 'success');
-      } catch (parseError: any) {
-        // If JSON parsing fails, use text response
-        if (!response.ok) {
-          throw new Error(responseText || `Failed to generate brief document: ${response.status}`);
-        }
-        throw parseError;
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to generate document' }));
+        throw new Error(error.error || 'Failed to generate document');
       }
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to generate document');
+      }
+      
+      setBriefDocumentGenerated(true);
+      
+      // Extract base64 data from data URL
+      const base64Data = data.documentUrl.replace(/^data:.*?;base64,/, '');
+      
+      // Convert base64 to text (since it's currently text format, not real PDF)
+      const textContent = atob(base64Data);
+      
+      // Create blob as text/plain so it opens properly
+      const blob = new Blob([textContent], { type: 'text/plain' });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Open in new window
+      const newWindow = window.open(blobUrl, '_blank');
+      
+      // Also trigger download
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = (data.fileName || 'community-report-brief').replace('.pdf', '.txt');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up blob URL after a delay
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+        if (newWindow) {
+          newWindow.focus();
+        }
+      }, 100);
+      
+      showToast('Document generated and opened!', 'success');
     } catch (error: any) {
       console.error('Error generating brief document:', error);
-      showToast(error.message || 'Failed to generate brief document', 'error');
+      showToast(error.message || 'Failed to generate document', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGeneratePIL = async () => {
-    if (!isCurator) return;
-
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/community-reports/${communityReportId}/generate-document`, {
-        method: 'POST',
-      });
-
-      const responseText = await response.text();
-      let errorData: any = {};
-      let data: any = {};
-      
-      try {
-        if (!response.ok) {
-          errorData = JSON.parse(responseText);
-          throw new Error(errorData.error || `Failed to generate PIL: ${response.status} ${response.statusText}`);
-        }
-        
-        data = JSON.parse(responseText);
-        
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to generate PIL');
-        }
-        
-        setPilGenerated(true);
-        
-        // Load PIL signatures for display
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (currentUser) {
-          const { data: sigs } = await supabase
-            .from('e_signatures')
-            .select(`
-              *,
-              user:users!user_id (full_name, email)
-            `)
-            .eq('report_id', report.id);
-          setPilSignatures(sigs || []);
-        }
-        
-        showToast(data.message || 'PIL generated successfully!', 'success');
-      } catch (parseError: any) {
-        // If JSON parsing fails, use text response
-        if (!response.ok) {
-          throw new Error(responseText || `Failed to generate PIL: ${response.status}`);
-        }
-        throw parseError;
-      }
-    } catch (error: any) {
-      console.error('Error generating PIL:', error);
-      showToast(error.message || 'Failed to generate PIL', 'error');
-    } finally {
-      setLoading(false);
+  const handleGeneratePIL = () => {
+    if (!user) {
+      showToast('Please sign in to generate PIL', 'error');
+      return;
     }
+
+    if (isDemoData) {
+      showToast('Cannot generate PIL for demo data', 'error');
+      return;
+    }
+
+    // Open the PIL modal to enter demands
+    setShowPILModal(true);
   };
 
   const handleSendEmail = async () => {
-    if (!isCurator || !briefDocumentGenerated) return;
+    if (!user) {
+      showToast('You must be signed in to send emails', 'error');
+      return;
+    }
+    
+    if (isDemoData) {
+      showToast('Cannot send emails for demo data', 'error');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -193,7 +189,10 @@ export default function CommunityReportDetail({
   const [pilDemands, setPILDemands] = useState('');
 
   const handleFilePIL = async () => {
-    if (!isCurator) return;
+    if (!user) {
+      showToast('You must be signed in to file PIL', 'error');
+      return;
+    }
 
     if (!pilDemands.trim()) {
       showToast('Please enter demands before filing PIL', 'error');
@@ -215,9 +214,57 @@ export default function CommunityReportDetail({
         throw new Error(error.error || 'Failed to file PIL');
       }
 
-      showToast('PIL filed successfully! All signatories have been notified.', 'success');
+      const result = await response.json();
+      setPilGenerated(true);
       setShowPILModal(false);
       setPILDemands('');
+      
+      // Download and open PIL document if available
+      if (result.documentUrl) {
+        // Extract base64 data from data URL
+        const base64Data = result.documentUrl.replace(/^data:.*?;base64,/, '');
+        
+        // Convert base64 to text (since it's currently text format, not real PDF)
+        const textContent = atob(base64Data);
+        
+        // Create blob as text/plain so it opens properly
+        const blob = new Blob([textContent], { type: 'text/plain' });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        // Open in new window
+        const newWindow = window.open(blobUrl, '_blank');
+        
+        // Also trigger download
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = (result.fileName || 'pil-document').replace('.pdf', '.txt');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up blob URL after a delay
+        setTimeout(() => {
+          URL.revokeObjectURL(blobUrl);
+          if (newWindow) {
+            newWindow.focus();
+          }
+        }, 100);
+      }
+      
+      // Load PIL signatures for display
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        const { data: sigs } = await supabase
+          .from('e_signatures')
+          .select(`
+            *,
+            user:users!user_id (full_name, email)
+          `)
+          .eq('report_id', report.id);
+        setPilSignatures(sigs || []);
+      }
+      
+      showToast(result.message || 'PIL generated and opened!', 'success');
     } catch (error: any) {
       showToast(error.message || 'Failed to file PIL', 'error');
     } finally {
@@ -239,66 +286,81 @@ export default function CommunityReportDetail({
         </div>
       </div>
 
-      {/* Curator Actions */}
-      {isCurator && (
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 space-y-3">
-          <h3 className="font-semibold text-white">Curator Actions</h3>
-          
-          <div className="flex gap-3 flex-wrap">
-            {!isDemoData && (
-              <>
-                <button
-                  onClick={handleGenerateBriefDocument}
-                  disabled={loading || briefDocumentGenerated}
-                  className="px-4 py-2 bg-windows-blue text-white rounded-lg font-medium hover:bg-windows-blue-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : briefDocumentGenerated ? (
-                    <CheckCircle className="w-4 h-4" />
-                  ) : (
-                    <FileText className="w-4 h-4" />
-                  )}
-                  {briefDocumentGenerated ? 'Brief Document Generated' : 'Generate Documents'}
-                </button>
+      {/* Document Generation Actions - REBUILT FROM SCRATCH */}
+      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 space-y-4">
+        <h3 className="text-xl font-bold text-white mb-4">Generate Documents</h3>
+        
+        {!user ? (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <p className="text-yellow-400 text-sm">⚠️ Please sign in to generate documents</p>
+          </div>
+        ) : isDemoData ? (
+          <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-4">
+            <p className="text-gray-400 text-sm">⚠️ Demo data cannot generate documents. Please use a real community report.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Generate Document Button */}
+            <button
+              onClick={handleGenerateBriefDocument}
+              disabled={loading || briefDocumentGenerated}
+              className="w-full px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg hover:shadow-xl"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Generating Document...</span>
+                </>
+              ) : briefDocumentGenerated ? (
+                <>
+                  <CheckCircle className="w-5 h-5" />
+                  <span>Document Generated ✓</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-5 h-5" />
+                  <span>Generate Document</span>
+                </>
+              )}
+            </button>
+            <p className="text-xs text-gray-400 text-center">
+              Creates a brief document with incident details and government updates/actions
+            </p>
 
-                <button
-                  onClick={handleGeneratePIL}
-                  disabled={loading || pilGenerated}
-                  className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : pilGenerated ? (
-                    <CheckCircle className="w-4 h-4" />
-                  ) : (
-                    <FileText className="w-4 h-4" />
-                  )}
-                  {pilGenerated ? 'PIL Generated' : 'Generate PIL'}
-                </button>
-              </>
-            )}
-            
-            {isDemoData && (
-              <>
-                <div className="px-4 py-2 bg-gray-700 text-gray-400 rounded-lg font-medium flex items-center gap-2 cursor-not-allowed">
-                  <FileText className="w-4 h-4" />
-                  Generate Documents (Demo data - not available)
-                </div>
-                <div className="px-4 py-2 bg-gray-700 text-gray-400 rounded-lg font-medium flex items-center gap-2 cursor-not-allowed">
-                  <FileText className="w-4 h-4" />
-                  Generate PIL (Demo data - not available)
-                </div>
-              </>
-            )}
+            {/* Generate PIL Button */}
+            <button
+              onClick={handleGeneratePIL}
+              disabled={loading || pilGenerated}
+              className="w-full px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg hover:shadow-xl"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Generating PIL...</span>
+                </>
+              ) : pilGenerated ? (
+                <>
+                  <CheckCircle className="w-5 h-5" />
+                  <span>PIL Generated ✓</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-5 h-5" />
+                  <span>Generate PIL</span>
+                </>
+              )}
+            </button>
+            <p className="text-xs text-gray-400 text-center">
+              Creates a legal PIL document with e-signatures of all upvoters, ready for submission
+            </p>
 
+            {/* Additional Actions (shown after PIL is generated) */}
             {pilGenerated && (
-              <>
+              <div className="mt-6 pt-6 border-t border-gray-700 space-y-3">
                 <button
                   onClick={async () => {
-                    // Load PIL signatures
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (user) {
+                    const { data: { user: currentUser } } = await supabase.auth.getUser();
+                    if (currentUser) {
                       const { data: sigs } = await supabase
                         .from('e_signatures')
                         .select(`
@@ -311,36 +373,25 @@ export default function CommunityReportDetail({
                     setShowPILViewer(true);
                   }}
                   disabled={loading}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="w-full px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   <Eye className="w-4 h-4" />
-                  View E-Signatures
+                  <span>View E-Signatures</span>
                 </button>
 
                 <button
                   onClick={handleSendEmail}
                   disabled={loading}
-                  className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="w-full px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   <Send className="w-4 h-4" />
-                  Send to Authorities
+                  <span>Send to Authorities</span>
                 </button>
-
-                {status === 'active' && (
-                  <button
-                    onClick={() => setShowPILModal(true)}
-                    disabled={loading}
-                    className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    <FileText className="w-4 h-4" />
-                    File PIL
-                  </button>
-                )}
-              </>
+              </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Report Details */}
       <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 space-y-4">

@@ -9,9 +9,11 @@ import {
   Megaphone, 
   UserCircle,
   Bell,
-  Wind
+  Wind,
+  Shield
 } from 'lucide-react';
 import { useOS, AppId } from '@/lib/os-context';
+import { useAuth } from '@/lib/auth-context';
 import { useState, useEffect } from 'react';
 
 interface AppIcon {
@@ -27,6 +29,7 @@ const apps: AppIcon[] = [
   { id: 'predictor', icon: TrendingUp, label: 'Predictor', color: 'from-green-500 to-emerald-500' },
   { id: 'security', icon: ShieldCheck, label: 'Security', color: 'from-purple-500 to-pink-500' },
   { id: 'pollution', icon: Wind, label: 'Pollution', color: 'from-cyan-500 to-teal-500' },
+  { id: 'admin', icon: Shield, label: 'Admin', color: 'from-red-600 to-red-800' },
   { id: 'alerts', icon: Megaphone, label: 'Alerts', color: 'from-orange-500 to-red-500' },
   { id: 'profile', icon: UserCircle, label: 'Profile', color: 'from-gray-500 to-gray-700' },
 ];

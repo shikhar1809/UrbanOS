@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Home, ArrowLeft, AlertTriangle, Users, Map, Shield, User, Bell, Siren, Wind } from 'lucide-react';
+import { Home, ArrowLeft, AlertTriangle, Users, Map, Shield, User, Bell, Siren, Wind, ShieldCheck } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import SettingsButton from './SettingsButton';
 import WeatherDisplay from './WeatherDisplay';
@@ -33,6 +33,7 @@ const desktopIcons: DesktopIcon[] = [
   { id: 'security', icon: Shield, label: 'Security', color: 'from-purple-500 to-pink-500', position: { x: 8, y: 60 } },
   { id: 'alerts', icon: Siren, label: 'Alerts', color: 'from-orange-500 to-red-500', position: { x: 14, y: 30 } },
   { id: 'pollution', icon: Wind, label: 'Pollution', color: 'from-cyan-500 to-teal-500', position: { x: 14, y: 45 } },
+  { id: 'admin', icon: ShieldCheck, label: 'Admin', color: 'from-red-600 to-red-800', position: { x: 14, y: 60 } },
   { id: 'profile', icon: User, label: 'Profile', color: 'from-gray-500 to-gray-700', position: { x: 8, y: 75 } },
 ];
 

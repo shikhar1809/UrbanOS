@@ -45,10 +45,8 @@ export async function POST(
       }, { status: 404 });
     }
 
-    // Verify user is curator
-    if (communityReport.curator_id !== user.id) {
-      return NextResponse.json({ error: 'Only curator can generate document' }, { status: 403 });
-    }
+    // Allow any authenticated user to generate documents (not just curator)
+    // Note: The document will still show the actual curator's information
 
     // Fetch the report separately
     const { data: report, error: reportError } = await supabaseClient

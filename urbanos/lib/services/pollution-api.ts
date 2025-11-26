@@ -89,3 +89,103 @@ export function getAQILevel(aqi: number): {
   }
 }
 
+/**
+ * Pollution trend interface
+ */
+export interface PollutionTrend {
+  current: number;
+  previous: number;
+  change: number; // percentage
+  direction: 'up' | 'down' | 'stable';
+  period: 'hour' | 'day' | 'week';
+}
+
+/**
+ * Calculate trend between two values
+ */
+export function calculateTrend(
+  current: number,
+  previous: number,
+  period: 'hour' | 'day' | 'week' = 'day'
+): PollutionTrend {
+  const change = previous === 0 ? 0 : ((current - previous) / previous) * 100;
+  const direction: 'up' | 'down' | 'stable' = 
+    Math.abs(change) < 1 ? 'stable' : change > 0 ? 'up' : 'down';
+  
+  return {
+    current,
+    previous,
+    change: Math.abs(change),
+    direction,
+    period,
+  };
+}
+
+/**
+ * Get historical data grouped by time period
+ */
+export function getHistoricalData(
+  data: Array<{ timestamp: string; aqi_value?: number | null; level: number }>,
+  period: 'hour' | 'day' = 'hour'
+): Array<{ time: string; aqi: number }> {
+  const grouped = new Map<string, number[]>();
+  
+  data.forEach((item) => {
+    const date = new Date(item.timestamp);
+    let key: string;
+    
+    if (period === 'hour') {
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:00:00`;
+    } else {
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+    
+    const aqi = item.aqi_value || item.level;
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key)!.push(aqi);
+  });
+  
+  return Array.from(grouped.entries())
+    .map(([time, values]) => ({
+      time,
+      aqi: values.reduce((sum, val) => sum + val, 0) / values.length,
+    }))
+    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+}
+
+/**
+ * Compare two time periods
+ */
+export function comparePeriods(
+  currentData: Array<{ timestamp: string; aqi_value?: number | null; level: number }>,
+  previousData: Array<{ timestamp: string; aqi_value?: number | null; level: number }>
+): PollutionTrend {
+  const currentAvg = currentData.length > 0
+    ? currentData.reduce((sum, item) => sum + (item.aqi_value || item.level), 0) / currentData.length
+    : 0;
+  
+  const previousAvg = previousData.length > 0
+    ? previousData.reduce((sum, item) => sum + (item.aqi_value || item.level), 0) / previousData.length
+    : 0;
+  
+  return calculateTrend(currentAvg, previousAvg, 'day');
+}
+
+/**
+ * Get peak pollution time from hourly data
+ */
+export function getPeakPollutionTime(
+  hourlyData: Array<{ time: string; aqi: number }>
+): { hour: number; aqi: number } | null {
+  if (hourlyData.length === 0) return null;
+  
+  const peak = hourlyData.reduce((max, item) => 
+    item.aqi > max.aqi ? item : max
+  );
+  
+  const hour = new Date(peak.time).getHours();
+  return { hour, aqi: peak.aqi };
+}
+
