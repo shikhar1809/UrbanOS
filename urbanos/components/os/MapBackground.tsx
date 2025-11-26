@@ -593,16 +593,33 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
         if (reports.length > 0) {
           setCurrentIssueIndex(-1);
         
-          // Center map on first report
+          // Fit map to show all reports instead of just centering on first one
           setTimeout(() => {
             if (mapRef.current && reports.length > 0) {
-              const firstReport = reports[0];
-              mapRef.current.setView(firstReport.position, 13, {
-                animate: true,
-                duration: 0.5,
-              });
+              try {
+                // Create bounds from all report positions
+                const bounds = L.latLngBounds(
+                  reports.map(r => r.position as [number, number])
+                );
+                
+                // Fit map to show all markers with some padding
+                mapRef.current.fitBounds(bounds, {
+                  padding: [50, 50], // Add padding so markers aren't at the edge
+                  maxZoom: 15, // Don't zoom in too much
+                });
+                
+                console.log('🗺️ Map fitted to show all', reports.length, 'reports');
+              } catch (error) {
+                console.error('Error fitting map bounds:', error);
+                // Fallback: center on first report
+                const firstReport = reports[0];
+                mapRef.current.setView(firstReport.position, 13, {
+                  animate: true,
+                  duration: 0.5,
+                });
+              }
             }
-          }, 500);
+          }, 1000); // Increased timeout to ensure markers are rendered
         }
       } catch (error) {
         console.error('❌ Exception loading reports:', error);
@@ -1085,12 +1102,25 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
             }
             
             console.log('✅✅✅ RENDERING', validMarkers.length, 'REPORT MARKERS ON MAP');
+            console.log('📍 Sample marker position:', validMarkers[0]?.position);
             
-            return validMarkers.map((report) => (
+            return validMarkers.map((report) => {
+              const [lat, lng] = report.position;
+              console.log(`📍 Rendering marker ${report.id} at [${lat}, ${lng}]`);
+              
+              return (
                 <Marker 
                   key={report.id} 
                   position={report.position} 
                   icon={createReportTypeIcon(report.type)}
+                  eventHandlers={{
+                    add: () => {
+                      console.log(`✅ Marker ${report.id} added to map`);
+                    },
+                    remove: () => {
+                      console.log(`❌ Marker ${report.id} removed from map`);
+                    }
+                  }}
                 >
                 <Popup className="neo-popup">
                     <div className="neo-popup-content" style={{ minWidth: '200px', maxWidth: '300px' }}>
