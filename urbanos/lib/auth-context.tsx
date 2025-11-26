@@ -25,9 +25,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Handle OAuth callback - server tries first, client handles if server fails
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const error = urlParams.get('error');
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const error = urlParams.get('error');
     const serverError = error === 'server_exchange_failed' || error === 'callback_error';
     
     // If server failed to exchange, try client-side (code verifier is in browser storage)

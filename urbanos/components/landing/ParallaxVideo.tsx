@@ -94,11 +94,11 @@ export default function ParallaxVideo({
           ref={videoRef}
           src={MAIN_VIDEO}
           className="absolute inset-0 w-full h-full object-cover"
-                muted
-                playsInline
-                loop={true}
+          muted
+          playsInline
+          loop={true}
                 preload="metadata"
-                disablePictureInPicture
+          disablePictureInPicture
           disableRemotePlayback
           style={videoStyle}
         />

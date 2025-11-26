@@ -53,7 +53,7 @@ const createReportTypeIcon = (reportType: string): L.DivIcon => {
   const config = typeConfig[reportType] || typeConfig.other;
 
   return L.divIcon({
-    className: 'custom-report-marker',
+    className: 'neo-marker-wrapper',
     html: `
       <div style="
         width: 40px;
@@ -70,8 +70,6 @@ const createReportTypeIcon = (reportType: string): L.DivIcon => {
         font-size: 20px;
         cursor: pointer;
         transition: all 0.2s ease;
-        z-index: 1000;
-        pointer-events: auto;
       ">
         ${config.symbol}
       </div>
@@ -595,33 +593,16 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
         if (reports.length > 0) {
           setCurrentIssueIndex(-1);
         
-          // Fit map to show all reports instead of just centering on first one
+          // Center map on first report
           setTimeout(() => {
             if (mapRef.current && reports.length > 0) {
-              try {
-                // Create bounds from all report positions
-                const bounds = L.latLngBounds(
-                  reports.map(r => r.position as [number, number])
-                );
-                
-                // Fit map to show all markers with some padding
-                mapRef.current.fitBounds(bounds, {
-                  padding: [50, 50], // Add padding so markers aren't at the edge
-                  maxZoom: 15, // Don't zoom in too much
-                });
-                
-                console.log('🗺️ Map fitted to show all', reports.length, 'reports');
-              } catch (error) {
-                console.error('Error fitting map bounds:', error);
-                // Fallback: center on first report
-                const firstReport = reports[0];
-                mapRef.current.setView(firstReport.position, 13, {
-                  animate: true,
-                  duration: 0.5,
-                });
-              }
+              const firstReport = reports[0];
+              mapRef.current.setView(firstReport.position, 13, {
+                animate: true,
+                duration: 0.5,
+              });
             }
-          }, 1000); // Increased timeout to ensure markers are rendered
+          }, 500);
         }
       } catch (error) {
         console.error('❌ Exception loading reports:', error);
@@ -634,41 +615,17 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [String(dataView || 'all'), String(activeApp || 'none'), String(mapMode || 'reports')]); // Ensure stable dependency array - always 3 strings
 
-  // Fit map to show all reports when they load
+  // Center map on reports when they load
   useEffect(() => {
     if (reportMarkers.length > 0 && mapRef.current) {
-      // Wait for markers to be rendered before fitting bounds
-      const timer = setTimeout(() => {
-        try {
-          // Create bounds from all report positions
-          const bounds = L.latLngBounds(
-            reportMarkers.map(r => r.position as [number, number])
-          );
-          
-          // Fit map to show all markers with padding
-          if (mapRef.current) {
-            mapRef.current.fitBounds(bounds, {
-              padding: [50, 50],
-              maxZoom: 15,
-            });
-            console.log('🗺️ Map fitted to show all', reportMarkers.length, 'report markers');
-          }
-        } catch (error) {
-          console.error('Error fitting map bounds:', error);
-          // Fallback: center on first report
-          if (reportMarkers.length > 0 && mapRef.current) {
-            const firstReport = reportMarkers[0];
-            mapRef.current.setView(firstReport.position, 13, {
-              animate: true,
-              duration: 0.5,
-            });
-          }
-        }
-      }, 1500); // Wait for markers to render
-      
-      return () => clearTimeout(timer);
+      const firstReport = reportMarkers[0];
+      console.log('Centering map on first report:', firstReport.position);
+      mapRef.current.setView(firstReport.position, 13, {
+        animate: true,
+        duration: 0.5,
+      });
     }
-  }, [reportMarkers.length]); // Only depend on length to avoid re-centering on every render
+  }, [reportMarkers]);
 
   // Load pollution data when pollution view is selected
   useEffect(() => {
@@ -1128,25 +1085,12 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
             }
             
             console.log('✅✅✅ RENDERING', validMarkers.length, 'REPORT MARKERS ON MAP');
-            console.log('📍 Sample marker position:', validMarkers[0]?.position);
             
-            return validMarkers.map((report) => {
-              const [lat, lng] = report.position;
-              console.log(`📍 Rendering marker ${report.id} at [${lat}, ${lng}]`);
-              
-              return (
+            return validMarkers.map((report) => (
                 <Marker 
                   key={report.id} 
                   position={report.position} 
                   icon={createReportTypeIcon(report.type)}
-                  eventHandlers={{
-                    add: () => {
-                      console.log(`✅ Marker ${report.id} added to map`);
-                    },
-                    remove: () => {
-                      console.log(`❌ Marker ${report.id} removed from map`);
-                    }
-                  }}
                 >
                 <Popup className="neo-popup">
                     <div className="neo-popup-content" style={{ minWidth: '200px', maxWidth: '300px' }}>
