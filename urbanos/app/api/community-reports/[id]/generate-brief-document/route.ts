@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
-import { generateCommunityReportPDF } from '@/lib/services/pdf-generator';
+import { generateBriefDocumentPDF } from '@/lib/services/pdf-generator';
 
 export async function POST(
   request: NextRequest,
@@ -31,7 +31,6 @@ export async function POST(
     }
 
     // Get community report
-    // First, get the community report without joins to avoid RLS issues
     const { data: communityReport, error: crError } = await supabaseClient
       .from('community_reports')
       .select('*')
@@ -40,8 +39,6 @@ export async function POST(
 
     if (crError || !communityReport) {
       console.error('Error fetching community report:', crError);
-      console.error('Community report ID:', communityReportId);
-      console.error('User ID:', user.id);
       return NextResponse.json({ 
         error: 'Community report not found',
         details: process.env.NODE_ENV === 'development' ? crError?.message : undefined
@@ -53,7 +50,7 @@ export async function POST(
       return NextResponse.json({ error: 'Only curator can generate document' }, { status: 403 });
     }
 
-    // Now fetch the report separately (this will respect RLS but curator should have access)
+    // Fetch the report separately
     const { data: report, error: reportError } = await supabaseClient
       .from('reports')
       .select('*')
@@ -62,7 +59,6 @@ export async function POST(
 
     if (reportError || !report) {
       console.error('Error fetching report:', reportError);
-      console.error('Report ID:', communityReport.report_id);
       return NextResponse.json({ 
         error: 'Report data not found',
         details: process.env.NODE_ENV === 'development' ? reportError?.message : undefined
@@ -76,50 +72,34 @@ export async function POST(
       .eq('id', communityReport.curator_id)
       .single();
 
-    // Get all upvoters with e-signatures
-    // Fetch signatures separately to avoid RLS join issues
-    const { data: signatures, error: sigError } = await supabaseClient
-      .from('e_signatures')
-      .select('user_id, signed_at, signature_data')
-      .eq('report_id', communityReport.report_id);
+    // Fetch all followups (government communications)
+    const { data: followups, error: followupsError } = await supabaseClient
+      .from('community_report_followups')
+      .select('*')
+      .eq('community_report_id', communityReportId)
+      .order('sent_at', { ascending: true });
 
-    // If no signatures found, that's okay - continue with empty array
-    if (sigError) {
-      console.warn('Error fetching signatures (continuing anyway):', sigError);
+    if (followupsError) {
+      console.warn('Error fetching followups (continuing anyway):', followupsError);
     }
 
-    // Fetch user details for each signature
-    const upvoters = await Promise.all(
-      (signatures || []).map(async (sig: any) => {
-        if (sig.user_id) {
-          const { data: userData } = await supabaseClient
-            .from('users')
-            .select('email, full_name')
-            .eq('id', sig.user_id)
-            .single();
-          
-          return {
-            name: userData?.full_name || sig.signature_data?.name || 'Unknown',
-            email: userData?.email || sig.signature_data?.email || '',
-            signed_at: sig.signed_at || new Date().toISOString(),
-            ip: sig.signature_data?.ip || 'N/A',
-          };
-        }
-        return {
-          name: sig.signature_data?.name || 'Unknown',
-          email: sig.signature_data?.email || '',
-          signed_at: sig.signed_at || new Date().toISOString(),
-          ip: sig.signature_data?.ip || 'N/A',
-        };
-      })
-    );
+    // Fetch report history (government actions and updates)
+    const { data: reportHistory, error: historyError } = await supabaseClient
+      .from('report_history')
+      .select(`
+        *,
+        agency:agencies(name),
+        performer:users!performed_by(full_name, email)
+      `)
+      .eq('report_id', communityReport.report_id)
+      .order('created_at', { ascending: true });
 
-    // Ensure all required fields exist
-    if (!report.title || !report.description || !report.location) {
-      return NextResponse.json({ error: 'Invalid report data' }, { status: 400 });
+    if (historyError) {
+      console.warn('Error fetching report history (continuing anyway):', historyError);
     }
 
-    const pdfBuffer = await generateCommunityReportPDF({
+    // Generate PDF
+    const pdfBuffer = await generateBriefDocumentPDF({
       report: {
         id: report.id || communityReport.report_id,
         title: report.title || 'Untitled Report',
@@ -129,13 +109,27 @@ export async function POST(
         images: report.images || [],
         videos: report.videos || [],
         submitted_at: report.submitted_at || report.created_at || new Date().toISOString(),
+        status: report.status || 'submitted',
+        priority: report.priority || 'medium',
       },
-      upvoters: upvoters.length > 0 ? upvoters : [{
-        name: 'No signatures yet',
-        email: '',
-        signed_at: new Date().toISOString(),
-        ip: 'N/A',
-      }],
+      followups: (followups || []).map((f: any) => ({
+        followupNumber: f.followup_number,
+        sentAt: f.sent_at,
+        responseReceivedAt: f.response_received_at,
+        responseStatus: f.response_status,
+        authorityResponse: f.authority_response,
+        curatorNotes: f.curator_notes,
+        emailOpensCount: f.email_opens_count || 0,
+      })),
+      reportHistory: (reportHistory || []).map((h: any) => ({
+        actionType: h.action_type,
+        description: h.description,
+        oldValue: h.old_value,
+        newValue: h.new_value,
+        performedAt: h.created_at,
+        performedBy: h.performer?.full_name || h.performer?.email || 'System',
+        agencyName: h.agency?.name || null,
+      })),
       curator: {
         name: curatorData?.full_name || user.email?.split('@')[0] || 'Unknown Curator',
         email: curatorData?.email || user.email || '',
@@ -143,18 +137,17 @@ export async function POST(
       upvoteCount: communityReport.upvote_count || 0,
     });
 
-    // Return PDF as base64 (storage upload is optional)
-    // In production, you can upload to storage bucket if needed
+    // Return PDF as base64
     const base64Pdf = pdfBuffer.toString('base64');
     
     return NextResponse.json({
       success: true,
       documentUrl: `data:application/pdf;base64,${base64Pdf}`,
-      fileName: 'community-report.pdf',
-      message: 'Document generated successfully',
+      fileName: 'community-report-brief.pdf',
+      message: 'Brief document generated successfully',
     });
   } catch (error: any) {
-    console.error('Error generating document:', error);
+    console.error('Error generating brief document:', error);
     console.error('Error stack:', error.stack);
     return NextResponse.json(
       { 

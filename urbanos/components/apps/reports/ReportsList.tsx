@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { Report } from '@/types';
-import { AlertTriangle, Clock, CheckCircle, XCircle, Calendar, Users, Award } from 'lucide-react';
+import { AlertTriangle, Clock, CheckCircle, XCircle, Calendar, Users, Award, Sparkles, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { useOS } from '@/lib/os-context';
+import { useToast } from '@/lib/toast-context';
 import ReportVoting from './ReportVoting';
 import dynamic from 'next/dynamic';
 
@@ -33,10 +34,12 @@ interface Upvoter {
 export default function ReportsList({ reports, showFilter = 'all' }: ReportsListProps) {
   const { user } = useAuth();
   const { zoomToReport } = useOS();
+  const { showToast } = useToast();
   const [voteCounts, setVoteCounts] = useState<Record<string, VoteCounts>>({});
   const [upvoters, setUpvoters] = useState<Record<string, Upvoter[]>>({});
   const [communityReports, setCommunityReports] = useState<Set<string>>(new Set());
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [promotingReportId, setPromotingReportId] = useState<string | null>(null);
 
   // Load vote counts and community report status
   useEffect(() => {
@@ -220,6 +223,45 @@ export default function ReportsList({ reports, showFilter = 'all' }: ReportsList
     checkCommunityReport(reportId);
   };
 
+  const handlePromoteToCommunityReport = async (reportId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening report detail modal
+    
+    if (!user) {
+      showToast('Please sign in to promote reports', 'error');
+      return;
+    }
+
+    setPromotingReportId(reportId);
+    try {
+      const response = await fetch('/api/community-reports/promote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reportId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to promote report');
+      }
+
+      showToast('Report promoted to community report! You can now use curator tools.', 'success');
+      
+      // Refresh community report status
+      await checkCommunityReport(reportId);
+      
+      // Reload votes to get updated count
+      await loadVotesForReport(reportId);
+    } catch (error: any) {
+      console.error('Error promoting report:', error);
+      showToast(error.message || 'Failed to promote report', 'error');
+    } finally {
+      setPromotingReportId(null);
+    }
+  };
+
   if (reports.length === 0) {
     return (
       <div className="flex items-center justify-center h-full p-6">
@@ -339,6 +381,32 @@ export default function ReportsList({ reports, showFilter = 'all' }: ReportsList
                     </div>
                   </div>
                 </div>
+
+                {/* Promote Button for My Reports */}
+                {isMyReport && !isCommunityReport && user && (
+                  <div className="mt-3 mb-3" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={(e) => handlePromoteToCommunityReport(report.id, e)}
+                      disabled={promotingReportId === report.id}
+                      className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg border-2 border-white/30"
+                    >
+                      {promotingReportId === report.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Promoting...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          Promote to Community Report
+                        </>
+                      )}
+                    </button>
+                    <p className="text-xs text-foreground/50 mt-1">
+                      Promote this report to test curator tools (normally requires 50+ upvotes)
+                    </p>
+                  </div>
+                )}
 
                 {/* Voting Section */}
                 <div className={`mt-4 pt-4 ${isCommunityReport ? 'border-t border-white/20' : 'border-t border-foreground/10'}`} onClick={(e) => e.stopPropagation()}>

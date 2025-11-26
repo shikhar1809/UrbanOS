@@ -490,40 +490,125 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
       try {
         console.log('🔍 Starting report query...');
         
-        // Verify Supabase client is initialized
-        if (!supabase) {
-          console.error('❌ Supabase client is not initialized!');
-          return;
-        }
+        // Try direct Supabase query first
+        let data: any[] | null = null;
+        let error: any = null;
         
-        let query = supabase
-          .from('reports')
-          .select('id, title, type, description, status, location, created_at, is_anonymous')
-          .order('created_at', { ascending: false });
+        if (supabase) {
+          let query = supabase
+            .from('reports')
+            .select('id, title, type, description, status, location, created_at, is_anonymous')
+            .order('created_at', { ascending: false });
 
-        // PERMANENT FIX: Apply filters based on view, but default to showing ALL reports
-        if (activeApp === 'security' || dataView === 'cybersecurity_alerts') {
-          query = query.eq('type', 'cybersecurity');
-        } else if (dataView === 'normal_alerts') {
-          query = query.neq('type', 'cybersecurity');
-        }
-        // For 'all_alerts' or any other view, show ALL reports (no filter)
-
-        console.log('🔍 Executing query...');
-        const { data, error } = await query.limit(500); // Increased limit for better coverage
-
-        if (error) {
-          console.error('❌ Error loading reports:', error);
-          console.error('Error details:', JSON.stringify(error, null, 2));
-          console.error('Error code:', error.code, 'Error message:', error.message);
-          console.error('Error hint:', error.hint);
-          // Check if it's an RLS policy issue
-          if (error.code === '42501' || error.message?.includes('policy') || error.message?.includes('permission')) {
-            console.error('⚠️ RLS Policy Error: Reports may not be accessible. Check Supabase RLS policies.');
-            console.error('⚠️ Run migration: 20240103000001_fix_public_view_all_reports.sql');
+          // PERMANENT FIX: Apply filters based on view, but default to showing ALL reports
+          if (activeApp === 'security' || dataView === 'cybersecurity_alerts') {
+            query = query.eq('type', 'cybersecurity');
+          } else if (dataView === 'normal_alerts') {
+            query = query.neq('type', 'cybersecurity');
           }
-          // PERMANENT FIX: Keep existing markers on error - never clear them
-          return;
+          // For 'all_alerts' or any other view, show ALL reports (no filter)
+
+          console.log('🔍 Executing direct Supabase query...');
+          console.log('🔍 Query details:', {
+            table: 'reports',
+            filters: {
+              activeApp,
+              dataView,
+              typeFilter: activeApp === 'security' || dataView === 'cybersecurity_alerts' ? 'cybersecurity' : 
+                         dataView === 'normal_alerts' ? 'not cybersecurity' : 'all'
+            }
+          });
+          
+          const result = await query.limit(500);
+          data = result.data;
+          error = result.error;
+        }
+
+        // If direct query fails (likely RLS issue), use API route as fallback
+        if (error || !data) {
+          console.warn('⚠️ Direct Supabase query failed, trying API route fallback...');
+          if (error) {
+            console.error('❌ Error loading reports:', error);
+            console.error('Error details:', JSON.stringify(error, null, 2));
+            console.error('Error code:', error.code, 'Error message:', error.message);
+            
+            // Check if it's an RLS policy issue
+            if (error.code === '42501' || error.message?.includes('policy') || error.message?.includes('permission') || error.message?.includes('RLS')) {
+              console.warn('⚠️ RLS Policy Error detected - using API route fallback');
+            }
+          }
+          
+          // Fallback: Use API route with service role key (bypasses RLS)
+          try {
+            const apiUrl = new URL('/api/reports/public', window.location.origin);
+            apiUrl.searchParams.set('activeApp', activeApp || '');
+            apiUrl.searchParams.set('dataView', dataView || '');
+            apiUrl.searchParams.set('limit', '500');
+            
+            console.log('🔄 Fetching reports from API route:', apiUrl.toString());
+            const response = await fetch(apiUrl.toString());
+            
+            const responseText = await response.text();
+            let apiResult: any;
+            
+            try {
+              apiResult = JSON.parse(responseText);
+            } catch (parseError) {
+              console.error('❌ Failed to parse API response:', responseText);
+              throw new Error(`API route returned invalid JSON: ${response.status} ${response.statusText}`);
+            }
+            
+            if (!response.ok) {
+              console.error('❌ API route error response:', apiResult);
+              throw new Error(apiResult.error || `API route returned ${response.status}: ${responseText}`);
+            }
+            
+            if (apiResult.success && apiResult.reports) {
+              console.log('✅ API route fallback successful:', apiResult.count, 'reports');
+              console.log('📊 API route stats:', {
+                totalFetched: apiResult.totalFetched || apiResult.count,
+                validReports: apiResult.count,
+                filteredOut: apiResult.filteredOut || 0,
+              });
+              if (apiResult.reports.length === 0) {
+                console.warn('⚠️ API route returned 0 reports - possible reasons:');
+                console.warn('  1. Database is empty (no reports exist)');
+                console.warn('  2. All reports have invalid locations');
+                console.warn('  3. Reports filtered out by view settings');
+                console.warn('  4. Check Supabase dashboard to verify reports exist');
+              }
+              data = apiResult.reports;
+              error = null;
+            } else {
+              console.error('❌ API route returned invalid data structure:', apiResult);
+              throw new Error(apiResult.error || 'API route returned invalid data');
+            }
+          } catch (apiError: any) {
+            console.error('❌ API route fallback failed:', apiError);
+            console.error('Error message:', apiError.message);
+            console.error('Error stack:', apiError.stack);
+            
+            // Show user-friendly error in console
+            console.error('💡 TROUBLESHOOTING STEPS:');
+            console.error('1. Check if SUPABASE_SERVICE_ROLE_KEY is set in Vercel environment variables');
+            console.error('2. Run this SQL in Supabase SQL Editor:');
+            console.error(`
+-- Copy and run this in Supabase SQL Editor:
+DROP POLICY IF EXISTS "Public can view non-anonymous reports" ON public.reports;
+DROP POLICY IF EXISTS "Users can view their own reports" ON public.reports;
+DROP POLICY IF EXISTS "Users can view reports" ON public.reports;
+DROP POLICY IF EXISTS "Public can view all reports" ON public.reports;
+
+CREATE POLICY "Public can view all reports"
+  ON public.reports FOR SELECT
+  USING (true);
+            `);
+            console.error('3. Verify reports exist in the database (check Supabase dashboard)');
+            console.error('4. Check browser console Network tab for API route errors');
+            
+            // PERMANENT FIX: Keep existing markers on error - never clear them
+            return;
+          }
         }
 
         console.log('📊 Reports loaded from DB:', data?.length || 0, 'reports');
@@ -538,9 +623,30 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
         
         if (!data || data.length === 0) {
           console.warn('⚠️ No reports found. Possible reasons:');
-          console.warn('1. RLS policies blocking access (try signing in)');
-          console.warn('2. No reports exist in the database');
-          console.warn('3. All reports filtered out');
+          console.warn('1. RLS policies blocking access - Run migration: 20240103000001_fix_public_view_all_reports.sql');
+          console.warn('2. No reports exist in the database - Create a test report via UI');
+          console.warn('3. All reports filtered out by view settings');
+          console.warn('4. Query returned empty array (check Supabase dashboard)');
+          
+          // Test query to verify connection
+          console.log('🔍 Testing Supabase connection...');
+          try {
+            const { data: testData, error: testError } = await supabase
+              .from('reports')
+              .select('id')
+              .limit(1);
+            
+            if (testError) {
+              console.error('❌ Test query failed:', testError);
+              console.error('This confirms RLS policy is blocking access');
+            } else {
+              console.log('✅ Test query succeeded, but no reports returned');
+              console.log('This means either: no reports exist, or they are filtered out');
+            }
+          } catch (testErr) {
+            console.error('❌ Test query exception:', testErr);
+          }
+          
           // PERMANENT FIX: Only clear on first load if we have no data
           if (!reportsLoadedRef.current) {
             setReportMarkers([]);
@@ -1061,12 +1167,22 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
             
             // Show reports in all other cases
             if (reportMarkers.length === 0) {
-              console.warn('⚠️ No report markers to display (length = 0). Reasons could be:');
-              console.warn('  1. No reports in database');
-              console.warn('  2. RLS policy blocking access');
+              console.warn('⚠️ No report markers to display (length = 0)');
+              console.warn('  Possible reasons:');
+              console.warn('  1. No reports in database - Create a test report');
+              console.warn('  2. RLS policy blocking access - Run migration: 20240103000001_fix_public_view_all_reports.sql');
               console.warn('  3. Reports filtered out by view settings');
-              console.warn('  4. Reports still loading...');
-              return null;
+              console.warn('  4. Reports still loading... (check Network tab)');
+              console.warn('  5. SUPABASE_SERVICE_ROLE_KEY not set in Vercel');
+              console.warn('  💡 Check browser console Network tab for /api/reports/public errors');
+              return (
+                <div className="absolute top-4 left-4 z-[1000] bg-yellow-500/90 text-black px-4 py-2 rounded-lg shadow-lg max-w-md">
+                  <p className="font-semibold">⚠️ No Reports Found</p>
+                  <p className="text-sm mt-1">
+                    Check console for details. If reports exist, ensure SUPABASE_SERVICE_ROLE_KEY is set in Vercel.
+                  </p>
+                </div>
+              );
             }
             
             console.log('✅ Will attempt to render', reportMarkers.length, 'report markers');

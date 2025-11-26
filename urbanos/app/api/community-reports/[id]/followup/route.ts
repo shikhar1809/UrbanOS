@@ -11,6 +11,15 @@ export async function POST(
     const { id } = await params;
     const communityReportId = id;
 
+    // Validate UUID format - demo data uses string IDs like "demo-escalated-001"
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(communityReportId)) {
+      return NextResponse.json({ 
+        error: 'Cannot create follow-up for demo data. Please use a real community report.',
+        details: 'Demo reports are for display purposes only.'
+      }, { status: 400 });
+    }
+
     // Get current user
     const {
       data: { user },
@@ -124,6 +133,15 @@ export async function GET(
     const supabaseClient = await createClient();
     const { id } = await params;
     const communityReportId = id;
+
+    // Validate UUID format - demo data uses string IDs like "demo-escalated-001"
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(communityReportId)) {
+      return NextResponse.json({ 
+        error: 'Cannot fetch follow-ups for demo data. Please use a real community report.',
+        details: 'Demo reports are for display purposes only.'
+      }, { status: 400 });
+    }
 
     // Get current user
     const {
