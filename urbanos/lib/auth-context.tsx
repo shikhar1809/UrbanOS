@@ -24,64 +24,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Handle OAuth callback - check for code in URL and exchange it
-    const handleOAuthCallback = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      const error = urlParams.get('error');
-      
-      if (error) {
-        // Check for actual OAuth errors from Supabase
-        const errorDescription = urlParams.get('error_description');
-        
-        // Only log meaningful errors - ignore 'no_code' as it's handled server-side
-        if (error === 'access_denied') {
-          console.warn('OAuth cancelled by user');
-        } else if (error === 'no_code') {
-          // 'no_code' means callback was hit without code - this is normal
-          // Supabase might have processed OAuth server-side and set cookies
-          // Just clean up URL and let session check handle it
-          console.log('OAuth callback: no code parameter (checking for existing session)');
-        } else {
-          // Real OAuth error
-          console.error('OAuth error:', error, errorDescription || '');
-        }
-        
-        // Clean up URL - remove error params
-        const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, '', cleanUrl);
-        
-        // Don't return early - let the session check run below
-        // The session might exist even if there's an error param
-      }
-
-      if (code) {
+    // Handle OAuth callback - server tries first, client handles if server fails
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const error = urlParams.get('error');
+    const serverError = error === 'server_exchange_failed' || error === 'callback_error';
+    
+    // If server failed to exchange, try client-side (code verifier is in browser storage)
+    if (code && serverError) {
+      const exchangeCode = async () => {
         try {
-          console.log('Exchanging OAuth code for session...');
-          // Exchange code for session on client side
+          console.log('Server exchange failed, trying client-side exchange...');
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
           
-          if (exchangeError) {
-            console.error('Error exchanging code:', exchangeError);
-            window.history.replaceState({}, '', '/');
-            return;
-          }
-          
-          if (data.session) {
-            console.log('OAuth session established:', data.session.user.email);
-            // Clean up URL
-            window.history.replaceState({}, '', '/');
+          if (!exchangeError && data.session) {
+            console.log('Client-side OAuth exchange successful');
+            // Clean up URL params but preserve pathname
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.delete('code');
+            newUrl.searchParams.delete('error');
+            newUrl.searchParams.delete('error_description');
+            newUrl.searchParams.delete('next');
+            window.history.replaceState({}, '', newUrl.pathname + newUrl.search);
             // Session will be picked up by auth state change listener
-            return;
+          } else {
+            console.error('Client-side exchange also failed:', exchangeError);
+            // Clean up URL anyway
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.delete('code');
+            newUrl.searchParams.set('error', 'oauth_failed');
+            window.history.replaceState({}, '', newUrl.pathname + newUrl.search);
           }
-        } catch (error) {
-          console.error('Exception in OAuth callback:', error);
-          window.history.replaceState({}, '', '/');
+        } catch (err) {
+          console.error('Exception in client-side exchange:', err);
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.delete('code');
+          newUrl.searchParams.set('error', 'oauth_exception');
+          window.history.replaceState({}, '', newUrl.pathname + newUrl.search);
         }
+      };
+      
+      exchangeCode();
+    } else if (code && !error) {
+      // Code present but no error - server handled it successfully
+      // Just clean up URL params but preserve pathname
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('code');
+      newUrl.searchParams.delete('next');
+      window.history.replaceState({}, '', newUrl.pathname + newUrl.search);
+    } else if (error && !code) {
+      // Error without code - handle errors
+      if (error === 'access_denied') {
+        console.warn('OAuth cancelled by user');
+      } else if (error !== 'no_code') {
+        console.error('OAuth error:', error, urlParams.get('error_description') || '');
       }
-    };
-
-    handleOAuthCallback();
+      // Clean up URL
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('error');
+      newUrl.searchParams.delete('error_description');
+      window.history.replaceState({}, '', newUrl.pathname);
+    }
 
     // Check active session on mount
     const initializeAuth = async () => {
@@ -289,15 +292,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
-    // Redirect to auth callback route which will then redirect to landing page
-    // This is required for Supabase SSR OAuth flow
-    const redirectTo = `${window.location.origin}/auth/callback?next=/`;
+    // Preserve current pathname so user returns to the same page after sign-in
+    // Default to '/' if on auth callback page or root
+    const currentPath = window.location.pathname;
+    const nextPath = currentPath === '/auth/callback' || currentPath === '/' ? '/' : currentPath;
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+    
+    console.log('[Sign In] Current path:', currentPath, '→ Redirecting to:', nextPath);
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectTo,
+        // Use PKCE flow - code verifier will be stored and retrieved automatically
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
+      // Ensure PKCE flow is used (default for browser clients)
     });
 
     if (error) {

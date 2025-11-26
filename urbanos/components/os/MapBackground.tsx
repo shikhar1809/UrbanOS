@@ -488,6 +488,14 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
 
     const loadReports = async () => {
       try {
+        console.log('🔍 Starting report query...');
+        
+        // Verify Supabase client is initialized
+        if (!supabase) {
+          console.error('❌ Supabase client is not initialized!');
+          return;
+        }
+        
         let query = supabase
           .from('reports')
           .select('id, title, type, description, status, location, created_at, is_anonymous')
@@ -501,16 +509,32 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
         }
         // For 'all_alerts' or any other view, show ALL reports (no filter)
 
+        console.log('🔍 Executing query...');
         const { data, error } = await query.limit(500); // Increased limit for better coverage
 
         if (error) {
           console.error('❌ Error loading reports:', error);
           console.error('Error details:', JSON.stringify(error, null, 2));
+          console.error('Error code:', error.code, 'Error message:', error.message);
+          console.error('Error hint:', error.hint);
+          // Check if it's an RLS policy issue
+          if (error.code === '42501' || error.message?.includes('policy') || error.message?.includes('permission')) {
+            console.error('⚠️ RLS Policy Error: Reports may not be accessible. Check Supabase RLS policies.');
+            console.error('⚠️ Run migration: 20240103000001_fix_public_view_all_reports.sql');
+          }
           // PERMANENT FIX: Keep existing markers on error - never clear them
           return;
         }
 
         console.log('📊 Reports loaded from DB:', data?.length || 0, 'reports');
+        if (data && data.length > 0) {
+          console.log('📋 Sample report:', {
+            id: data[0].id,
+            title: data[0].title,
+            is_anonymous: data[0].is_anonymous,
+            has_location: !!data[0].location,
+          });
+        }
         
         if (!data || data.length === 0) {
           console.warn('⚠️ No reports found. Possible reasons:');
@@ -1015,6 +1039,14 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
             const isPollutionView = dataView === 'pollution' || activeApp === 'pollution';
             const isHeatmapMode = mapMode === 'heatmap';
             
+            console.log('🗺️ Report rendering check:', {
+              dataView,
+              activeApp,
+              isPollutionView,
+              isHeatmapMode,
+              reportMarkersCount: reportMarkers.length,
+            });
+            
             // Hide if viewing pollution AND not in heatmap mode
             if (isPollutionView && !isHeatmapMode) {
               console.log('🚫 Hiding report markers - pollution view without heatmap');
@@ -1029,7 +1061,11 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
             
             // Show reports in all other cases
             if (reportMarkers.length === 0) {
-              console.log('⚠️ No report markers to display (length = 0)');
+              console.warn('⚠️ No report markers to display (length = 0). Reasons could be:');
+              console.warn('  1. No reports in database');
+              console.warn('  2. RLS policy blocking access');
+              console.warn('  3. Reports filtered out by view settings');
+              console.warn('  4. Reports still loading...');
               return null;
             }
             
