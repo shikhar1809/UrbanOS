@@ -292,33 +292,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
-    // Preserve current pathname so user returns to the same page after sign-in
-    // Default to '/' if on auth callback page or root
-    const currentPath = window.location.pathname;
-    const nextPath = currentPath === '/auth/callback' || currentPath === '/' ? '/' : currentPath;
-    
-    // Use NEXT_PUBLIC_APP_URL if available (for production), otherwise use current origin
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-    const redirectTo = `${appUrl}/auth/callback?next=${encodeURIComponent(nextPath)}`;
-    
-    console.log('[Sign In] Current path:', currentPath, '→ Redirecting to:', nextPath);
-    console.log('[Sign In] Using app URL:', appUrl);
-    
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectTo,
-        // Use PKCE flow - code verifier will be stored and retrieved automatically
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
+    try {
+      // Preserve current pathname so user returns to the same page after sign-in
+      // Default to '/' if on auth callback page or root
+      const currentPath = window.location.pathname;
+      const nextPath = currentPath === '/auth/callback' || currentPath === '/' ? '/' : currentPath;
+      
+      // Use NEXT_PUBLIC_APP_URL if available (for production), otherwise use current origin
+      // In production (Vercel), this should be set to the Vercel URL
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      const redirectTo = `${appUrl}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+      
+      console.log('[Sign In] Current path:', currentPath, '→ Redirecting to:', nextPath);
+      console.log('[Sign In] Using app URL:', appUrl);
+      console.log('[Sign In] Full redirect URL:', redirectTo);
+      console.log('[Sign In] NEXT_PUBLIC_APP_URL env:', process.env.NEXT_PUBLIC_APP_URL || 'NOT SET');
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectTo,
+          // Use PKCE flow - code verifier will be stored and retrieved automatically
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
-      },
-      // Ensure PKCE flow is used (default for browser clients)
-    });
+        // Ensure PKCE flow is used (default for browser clients)
+      });
 
-    if (error) {
-      console.error('Google sign-in error:', error);
+      if (error) {
+        console.error('[Sign In] Google sign-in error:', error);
+        throw error;
+      }
+
+      if (data?.url) {
+        console.log('[Sign In] OAuth URL generated:', data.url);
+        // The redirect happens automatically via data.url
+      }
+    } catch (error: any) {
+      console.error('[Sign In] Exception during sign-in:', error);
+      throw error;
     }
   };
 
