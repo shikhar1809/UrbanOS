@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('reports')
-      .select('id, title, type, description, status, location, created_at, is_anonymous')
+      .select('*') // Select all fields for full report details
       .not('location', 'is', null) // Ensure location is not null
       .order('created_at', { ascending: false });
 

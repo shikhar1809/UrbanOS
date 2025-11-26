@@ -116,44 +116,26 @@ export default function ReportsApp() {
       }
 
       // Load all reports (for "All Reports" view)
-      // Public users can see non-anonymous reports, logged-in users see more
-      console.log('loadReports: Loading all reports...');
-      let query = supabase
-        .from('reports')
-        .select('*');
-
-      // Don't filter by is_anonymous - we want to show all reports including demo ones
-      // Demo reports will show fake creator names anyway
-      if (!user) {
-        // Public (not logged in): only show non-anonymous reports
-        console.log('loadReports: Loading all reports (public - non-anonymous only)');
-        query = query.eq('is_anonymous', false);
-      } else if (profile?.role === 'citizen') {
-        // Citizens can see all reports (demo reports will show fake names)
-        console.log('loadReports: Loading all reports (citizen)');
-      } else if (profile?.role === 'agency') {
-        // Agencies see all reports or assigned reports
-        console.log('loadReports: Loading all reports (agency)');
-      } else {
-        console.log('loadReports: Loading all reports (other role)');
-      }
-
-      const { data: allReportsData, error: allError } = await query.order('created_at', {
-        ascending: false,
-      });
-
-      if (allError) {
-        console.error('Error loading all reports:', {
-          error: allError,
-          code: allError.code,
-          message: allError.message,
-          details: allError.details,
-          hint: allError.hint,
+      // Use API route to bypass RLS and ensure reports are always visible
+      console.log('loadReports: Loading all reports via API route...');
+      
+      // Fetch reports from the public API route (uses service role key, bypasses RLS)
+      const apiResponse = await fetch('/api/reports/public?dataView=all_alerts&limit=500');
+      
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json().catch(() => ({}));
+        console.error('Error loading all reports from API:', {
+          status: apiResponse.status,
+          statusText: apiResponse.statusText,
+          error: errorData,
         });
-        throw allError;
+        throw new Error(errorData.error || `Failed to load reports: ${apiResponse.statusText}`);
       }
       
-      console.log('loadReports: All reports loaded:', allReportsData?.length || 0);
+      const apiData = await apiResponse.json();
+      const allReportsData = apiData.reports || [];
+      
+      console.log('loadReports: All reports loaded from API:', allReportsData?.length || 0);
       
       // Fetch creator info separately for each report (more reliable than join)
       const reportsWithCreators = await Promise.all(
