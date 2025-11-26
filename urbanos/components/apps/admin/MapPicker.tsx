@@ -89,7 +89,8 @@ function LocationMarker({
   setPosition, 
   isGeocoding, 
   setIsGeocoding 
-}: MapPickerProps & { 
+}: { 
+  onLocationChange: (location: { lat: number; lng: number; address: string } | null) => void;
   position: L.LatLng | null; 
   setPosition: (pos: L.LatLng | null) => void; 
   isGeocoding: boolean; 
