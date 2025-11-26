@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Report, RiskZone } from '@/types';
-import { MapPin, AlertTriangle, TrendingUp, Clock, Shield, Bell, Calendar, Road, Zap } from 'lucide-react';
+import { MapPin, AlertTriangle, TrendingUp, Clock, Shield, Bell, Calendar, Navigation2, Zap } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const RiskMap = dynamic(() => import('./predictor/RiskMap'), { ssr: false });
@@ -510,6 +510,7 @@ export default function PredictorApp() {
               location: { lat: r.location.lat, lng: r.location.lng },
               occurred_at: r.created_at,
               severity: r.priority === 'high' ? 'high' : r.priority === 'medium' ? 'medium' : 'low',
+              created_at: r.created_at,
             }))} />
           </div>
 

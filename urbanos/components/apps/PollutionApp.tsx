@@ -256,6 +256,7 @@ export default function PollutionApp() {
                     occurred_at: item.timestamp,
                     severity: item.aqi_value && item.aqi_value > 150 ? 'high' : 
                               item.aqi_value && item.aqi_value > 100 ? 'medium' : 'low',
+                    created_at: item.timestamp || new Date().toISOString(),
                   }))}
                 />
               )}

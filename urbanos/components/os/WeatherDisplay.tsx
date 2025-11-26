@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { CloudSnow, CloudRain, Sun, Cloud } from 'lucide-react';
 
 interface WeatherData {
   temp: number;

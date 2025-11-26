@@ -15,6 +15,10 @@ interface CommunityReport {
   status: 'active' | 'resolved' | 'escalated_to_pil';
   promoted_at: string;
   report?: Report;
+  curator?: {
+    full_name: string | null;
+    email: string;
+  };
 }
 
 export default function CommunityReportsList() {

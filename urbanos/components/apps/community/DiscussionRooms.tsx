@@ -23,13 +23,9 @@ export default function DiscussionRooms() {
   useEffect(() => {
     if (selectedRoom) {
       loadMessages(selectedRoom.id);
-      subscribeToMessages(selectedRoom.id);
+      const cleanup = subscribeToMessages(selectedRoom.id);
+      return cleanup;
     }
-    return () => {
-      if (selectedRoom) {
-        supabase.removeChannel(`room-${selectedRoom.id}`);
-      }
-    };
   }, [selectedRoom]);
 
   const loadRooms = async () => {

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         // Check if tweet mentions @UrbanOS
         if (text.includes('@UrbanOS')) {
           // Parse the report from tweet
-          const parsed = parseSocialReport(text);
+          const parsed = await parseSocialReport(text);
           if (parsed) {
             // Create report in database
             const { data, error } = await supabase

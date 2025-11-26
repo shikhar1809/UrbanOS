@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
               const senderId = event.sender.id;
 
               // Parse the report from message
-              const parsed = parseSocialReport(message);
+              const parsed = await parseSocialReport(message);
               if (parsed) {
                 // Create report in database
                 const { data, error } = await supabase

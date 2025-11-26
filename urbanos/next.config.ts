@@ -78,9 +78,6 @@ const nextConfig: NextConfig = {
   // React strict mode for better error detection
   reactStrictMode: true,
 
-  // Optimize production builds
-  swcMinify: true,
-
   // Experimental optimizations
   experimental: {
     optimizePackageImports: ['lucide-react', 'framer-motion', '@supabase/supabase-js'],
