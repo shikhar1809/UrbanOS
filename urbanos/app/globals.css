@@ -371,6 +371,11 @@ html.lenis {
   border: none !important;
 }
 
+.custom-report-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
 .neo-marker {
   cursor: pointer;
   transition: all 0.2s ease;
@@ -379,6 +384,21 @@ html.lenis {
 .neo-marker:hover {
   transform: rotate(-45deg) scale(1.15) !important;
   box-shadow: 8px 8px 0px 0px rgba(0, 0, 0, 1) !important;
+}
+
+/* Ensure Leaflet markers are visible */
+.leaflet-marker-icon {
+  z-index: 1000 !important;
+  pointer-events: auto !important;
+}
+
+.leaflet-marker-pane {
+  z-index: 600 !important;
+}
+
+.custom-report-marker .leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
 }
 
 .neo-popup .leaflet-popup-content-wrapper {

@@ -53,7 +53,7 @@ const createReportTypeIcon = (reportType: string): L.DivIcon => {
   const config = typeConfig[reportType] || typeConfig.other;
 
   return L.divIcon({
-    className: 'neo-marker-wrapper',
+    className: 'custom-report-marker',
     html: `
       <div style="
         width: 40px;
@@ -70,6 +70,8 @@ const createReportTypeIcon = (reportType: string): L.DivIcon => {
         font-size: 20px;
         cursor: pointer;
         transition: all 0.2s ease;
+        z-index: 1000;
+        pointer-events: auto;
       ">
         ${config.symbol}
       </div>
@@ -632,17 +634,41 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [String(dataView || 'all'), String(activeApp || 'none'), String(mapMode || 'reports')]); // Ensure stable dependency array - always 3 strings
 
-  // Center map on reports when they load
+  // Fit map to show all reports when they load
   useEffect(() => {
     if (reportMarkers.length > 0 && mapRef.current) {
-      const firstReport = reportMarkers[0];
-      console.log('Centering map on first report:', firstReport.position);
-      mapRef.current.setView(firstReport.position, 13, {
-        animate: true,
-        duration: 0.5,
-      });
+      // Wait for markers to be rendered before fitting bounds
+      const timer = setTimeout(() => {
+        try {
+          // Create bounds from all report positions
+          const bounds = L.latLngBounds(
+            reportMarkers.map(r => r.position as [number, number])
+          );
+          
+          // Fit map to show all markers with padding
+          if (mapRef.current) {
+            mapRef.current.fitBounds(bounds, {
+              padding: [50, 50],
+              maxZoom: 15,
+            });
+            console.log('🗺️ Map fitted to show all', reportMarkers.length, 'report markers');
+          }
+        } catch (error) {
+          console.error('Error fitting map bounds:', error);
+          // Fallback: center on first report
+          if (reportMarkers.length > 0 && mapRef.current) {
+            const firstReport = reportMarkers[0];
+            mapRef.current.setView(firstReport.position, 13, {
+              animate: true,
+              duration: 0.5,
+            });
+          }
+        }
+      }, 1500); // Wait for markers to render
+      
+      return () => clearTimeout(timer);
     }
-  }, [reportMarkers]);
+  }, [reportMarkers.length]); // Only depend on length to avoid re-centering on every render
 
   // Load pollution data when pollution view is selected
   useEffect(() => {
