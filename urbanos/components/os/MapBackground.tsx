@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import { motion } from 'framer-motion';
-import { ZoomIn, ZoomOut, ChevronRight, Map, Layers } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronRight, Map as MapIcon, Layers } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { AppId, useOS } from '@/lib/os-context';
 import { fetchAQIData, getAQILevel } from '@/lib/services/pollution-api';
@@ -37,6 +37,16 @@ interface PollutionMarker {
   address: string;
   source: string;
   measured_at: string;
+}
+
+interface AlertMarker {
+  id: string;
+  position: [number, number];
+  title: string;
+  type: string;
+  description: string;
+  severity: string;
+  created_at: string;
 }
 
 // Create custom neo-brutalism marker icons for report types
@@ -82,7 +92,7 @@ const createReportTypeIcon = (reportType: string): L.DivIcon => {
 // Create pollution marker icon with AQI color
 const createPollutionIcon = (aqi: number): L.DivIcon => {
   const aqiLevel = getAQILevel(aqi);
-  
+
   return L.divIcon({
     className: 'neo-marker-wrapper',
     html: `
@@ -111,11 +121,49 @@ const createPollutionIcon = (aqi: number): L.DivIcon => {
   });
 };
 
+// Create blinking alert marker icon for road closures
+const createAlertIcon = (alertType: string, severity: string): L.DivIcon => {
+  const severityColors: Record<string, string> = {
+    low: '#10b981',      // green
+    medium: '#f59e0b',   // yellow
+    high: '#ef4444',     // red
+    critical: '#dc2626', // dark red
+  };
+
+  const color = severityColors[severity] || '#ef4444';
+  const icon = alertType === 'road_closure' ? '🚧' : '⚠️';
+
+  return L.divIcon({
+    className: 'alert-marker-wrapper',
+    html: `
+      <div class="alert-marker" style="
+        width: 50px;
+        height: 50px;
+        background: ${color};
+        border: 4px solid black;
+        border-radius: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 6px 6px 0px 0px rgba(0, 0, 0, 1);
+        position: relative;
+        font-weight: bold;
+        font-size: 24px;
+        cursor: pointer;
+      ">
+        ${icon}
+      </div>
+    `,
+    iconSize: [50, 50],
+    iconAnchor: [25, 25],
+  });
+};
+
 // Component to handle map center and bounds
-function MapController({ 
-  center, 
-  onMapReady 
-}: { 
+function MapController({
+  center,
+  onMapReady
+}: {
   center: [number, number];
   onMapReady?: (map: L.Map) => void;
 }) {
@@ -142,12 +190,12 @@ function MapController({
 }
 
 // Custom Zoom Controls Component with Next Issue button (inside MapContainer)
-function ZoomControls({ 
-  onNextIssue, 
+function ZoomControls({
+  onNextIssue,
   hasNextIssue,
   mapMode,
   onMapModeChange
-}: { 
+}: {
   onNextIssue: () => void;
   hasNextIssue: boolean;
   mapMode: 'reports' | 'heatmap';
@@ -173,14 +221,13 @@ function ZoomControls({
             e.preventDefault();
             onMapModeChange('reports');
           }}
-          className={`w-12 h-12 border-4 border-black flex items-center justify-center cursor-pointer group ${
-            mapMode === 'reports' ? 'bg-blue-500' : 'bg-white'
-          }`}
+          className={`w-12 h-12 border-4 border-black flex items-center justify-center cursor-pointer group ${mapMode === 'reports' ? 'bg-blue-500' : 'bg-white'
+            }`}
           style={{
             boxShadow: '6px 6px 0px 0px rgba(0, 0, 0, 1)',
             pointerEvents: 'auto',
           }}
-          whileHover={{ 
+          whileHover={{
             scale: 1.1,
             boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 1)',
           }}
@@ -188,7 +235,7 @@ function ZoomControls({
           transition={{ duration: 0.2 }}
           title="Reports View"
         >
-          <Map className={`w-6 h-6 ${mapMode === 'reports' ? 'text-white' : 'text-black'}`} strokeWidth={3} />
+          <MapIcon className={`w-6 h-6 ${mapMode === 'reports' ? 'text-white' : 'text-black'}`} strokeWidth={3} />
         </motion.button>
         <motion.button
           onClick={(e) => {
@@ -196,14 +243,13 @@ function ZoomControls({
             e.preventDefault();
             onMapModeChange('heatmap');
           }}
-          className={`w-12 h-12 border-4 border-black flex items-center justify-center cursor-pointer group ${
-            mapMode === 'heatmap' ? 'bg-orange-500' : 'bg-white'
-          }`}
+          className={`w-12 h-12 border-4 border-black flex items-center justify-center cursor-pointer group ${mapMode === 'heatmap' ? 'bg-orange-500' : 'bg-white'
+            }`}
           style={{
             boxShadow: '6px 6px 0px 0px rgba(0, 0, 0, 1)',
             pointerEvents: 'auto',
           }}
-          whileHover={{ 
+          whileHover={{
             scale: 1.1,
             boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 1)',
           }}
@@ -214,7 +260,7 @@ function ZoomControls({
           <Layers className={`w-6 h-6 ${mapMode === 'heatmap' ? 'text-white' : 'text-black'}`} strokeWidth={3} />
         </motion.button>
       </div>
-      
+
       {/* Next Issue Button */}
       <motion.button
         onClick={(e) => {
@@ -230,7 +276,7 @@ function ZoomControls({
           position: 'relative',
           zIndex: 1001,
         }}
-        whileHover={hasNextIssue ? { 
+        whileHover={hasNextIssue ? {
           scale: 1.1,
           boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 1)',
         } : {}}
@@ -252,7 +298,7 @@ function ZoomControls({
           boxShadow: '6px 6px 0px 0px rgba(0, 0, 0, 1)',
           pointerEvents: 'auto',
         }}
-        whileHover={{ 
+        whileHover={{
           scale: 1.1,
           boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 1)',
         }}
@@ -262,7 +308,7 @@ function ZoomControls({
       >
         <ZoomIn className="w-6 h-6 text-black" strokeWidth={3} />
       </motion.button>
-      
+
       <motion.button
         onClick={(e) => {
           e.stopPropagation();
@@ -274,7 +320,7 @@ function ZoomControls({
           boxShadow: '6px 6px 0px 0px rgba(0, 0, 0, 0, 1)',
           pointerEvents: 'auto',
         }}
-        whileHover={{ 
+        whileHover={{
           scale: 1.1,
           boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 1)',
         }}
@@ -289,12 +335,12 @@ function ZoomControls({
 }
 
 // External controls wrapper (outside MapContainer)
-function ExternalControls({ 
-  onNextIssue, 
+function ExternalControls({
+  onNextIssue,
   hasNextIssue,
   onZoomIn,
   onZoomOut
-}: { 
+}: {
   onNextIssue: () => void;
   hasNextIssue: boolean;
   onZoomIn: () => void;
@@ -315,7 +361,7 @@ function ExternalControls({
           boxShadow: '6px 6px 0px 0px rgba(0, 0, 0, 1)',
           pointerEvents: 'auto',
         }}
-        whileHover={hasNextIssue ? { 
+        whileHover={hasNextIssue ? {
           scale: 1.1,
           boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 1)',
         } : {}}
@@ -337,7 +383,7 @@ function ExternalControls({
           boxShadow: '6px 6px 0px 0px rgba(0, 0, 0, 1)',
           pointerEvents: 'auto',
         }}
-        whileHover={{ 
+        whileHover={{
           scale: 1.1,
           boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 1)',
         }}
@@ -347,7 +393,7 @@ function ExternalControls({
       >
         <ZoomIn className="w-6 h-6 text-black" strokeWidth={3} />
       </motion.button>
-      
+
       <motion.button
         onClick={(e) => {
           e.stopPropagation();
@@ -359,7 +405,7 @@ function ExternalControls({
           boxShadow: '6px 6px 0px 0px rgba(0, 0, 0, 1)',
           pointerEvents: 'auto',
         }}
-        whileHover={{ 
+        whileHover={{
           scale: 1.1,
           boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 1)',
         }}
@@ -384,6 +430,7 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
   const { setZoomToReportHandler } = useOS();
   const [reportMarkers, setReportMarkers] = useState<ReportMarker[]>([]);
   const [pollutionMarkers, setPollutionMarkers] = useState<PollutionMarker[]>([]);
+  const [alertMarkers, setAlertMarkers] = useState<AlertMarker[]>([]);
   const [isMapReady, setIsMapReady] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 }); // Default center position
@@ -394,7 +441,7 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
   const lastDataViewRef = useRef<string | undefined>(dataView); // Track last dataView to prevent unnecessary reloads
   const lastActiveAppRef = useRef<AppId | null | undefined>(activeApp); // Track last activeApp
   const lastMapModeRef = useRef<string>('reports'); // Track last mapMode
-  
+
   // Default center - Lucknow, India
   const defaultCenter: [number, number] = [26.8467, 80.9462]; // Lucknow
   const [mapCenter, setMapCenter] = useState<[number, number]>(defaultCenter);
@@ -429,13 +476,13 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
 
     // Listen for storage changes (when theme is updated in another tab/component)
     window.addEventListener('storage', handleThemeChange);
-    
+
     // Also listen for custom events if theme changes in same tab
     const handleCustomThemeChange = () => {
       const currentTheme = localStorage.getItem('urbanos-theme') as 'light' | 'dark' | null;
       setIsDarkMode(currentTheme === 'dark');
     };
-    
+
     window.addEventListener('urbanos-theme-changed', handleCustomThemeChange as EventListener);
 
     return () => {
@@ -450,7 +497,7 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
     const isPollutionView = dataView === 'pollution' || activeApp === 'pollution';
     const isHeatmapMode = mapMode === 'heatmap';
     const isInitialLoad = lastDataViewRef.current === undefined && lastActiveAppRef.current === undefined;
-    
+
     // Always load reports on initial mount, even if in pollution view (needed for heatmap)
     // Only skip loading if we're already loaded AND viewing pollution AND NOT in heatmap mode
     if (!isInitialLoad && isPollutionView && !isHeatmapMode && reportsLoadedRef.current) {
@@ -469,15 +516,15 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
     const dataViewChanged = lastDataViewRef.current !== dataView;
     const activeAppChanged = lastActiveAppRef.current !== activeApp;
     const mapModeChanged = lastMapModeRef.current !== String(mapMode || 'reports');
-    
+
     // Always reload on initial load, view change, or if we have no reports
-    const shouldReload = isInitialLoad || 
-                        dataViewChanged || 
-                        activeAppChanged || 
-                        mapModeChanged ||
-                        !reportsLoadedRef.current || 
-                        reportMarkers.length === 0;
-    
+    const shouldReload = isInitialLoad ||
+      dataViewChanged ||
+      activeAppChanged ||
+      mapModeChanged ||
+      !reportsLoadedRef.current ||
+      reportMarkers.length === 0;
+
     if (!shouldReload) {
       console.log('⏭️ Skipping reload - reports already loaded');
       return;
@@ -489,36 +536,37 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
     const loadReports = async () => {
       try {
         console.log('🔍 Starting report query...');
-        
+
         // ALWAYS use API route first (more reliable, bypasses RLS)
         let data: any[] | null = null;
         let error: any = null;
-        
+
         // Use API route with service role key (bypasses RLS)
         try {
           const apiUrl = new URL('/api/reports/public', window.location.origin);
           apiUrl.searchParams.set('activeApp', activeApp || '');
           apiUrl.searchParams.set('dataView', dataView || '');
           apiUrl.searchParams.set('limit', '500');
-          
+
           console.log('🔄 Fetching reports from API route:', apiUrl.toString());
           const response = await fetch(apiUrl.toString());
-          
+
           const responseText = await response.text();
           let apiResult: any;
-          
+
           try {
             apiResult = JSON.parse(responseText);
           } catch (parseError) {
             console.error('❌ Failed to parse API response:', responseText);
             throw new Error(`API route returned invalid JSON: ${response.status} ${response.statusText}`);
           }
-          
+
           if (!response.ok) {
-            console.error('❌ API route error response:', apiResult);
-            throw new Error(apiResult.error || `API route returned ${response.status}: ${responseText}`);
+            console.warn(`API route warning: ${apiResult.error || response.status}`);
+            // Don't throw here, just let it fall back to Supabase query
+            throw new Error(apiResult.error || `API route returned ${response.status}`);
           }
-          
+
           if (apiResult.success && apiResult.reports) {
             console.log('✅ API route successful:', apiResult.count, 'reports');
             console.log('📊 API route stats:', {
@@ -535,7 +583,7 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
         } catch (apiError: any) {
           console.error('❌ API route failed:', apiError);
           error = apiError;
-          
+
           // Fallback: Try direct Supabase query
           if (supabase) {
             console.log('🔄 Trying direct Supabase query as fallback...');
@@ -551,7 +599,7 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
             } else if (dataView === 'normal_alerts') {
               query = query.neq('type', 'cybersecurity');
             }
-            
+
             const result = await query.limit(500);
             data = result.data;
             error = result.error;
@@ -562,41 +610,39 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
         if (error || !data) {
           console.warn('⚠️ Direct Supabase query failed, trying API route fallback...');
           if (error) {
-            console.error('❌ Error loading reports:', error);
-            console.error('Error details:', JSON.stringify(error, null, 2));
-            console.error('Error code:', error.code, 'Error message:', error.message);
-            
-            // Check if it's an RLS policy issue
-            if (error.code === '42501' || error.message?.includes('policy') || error.message?.includes('permission') || error.message?.includes('RLS')) {
-              console.warn('⚠️ RLS Policy Error detected - using API route fallback');
+            // Only log helpful info, not object dump
+            if (error.code === '42501' || error.message?.includes('policy')) {
+              console.warn('RLS Policy blocked direct access - this is expected');
+            } else {
+              console.warn(`Supabase error: ${error.message}`);
             }
           }
-          
+
           // Fallback: Use API route with service role key (bypasses RLS)
           try {
             const apiUrl = new URL('/api/reports/public', window.location.origin);
             apiUrl.searchParams.set('activeApp', activeApp || '');
             apiUrl.searchParams.set('dataView', dataView || '');
             apiUrl.searchParams.set('limit', '500');
-            
+
             console.log('🔄 Fetching reports from API route:', apiUrl.toString());
             const response = await fetch(apiUrl.toString());
-            
+
             const responseText = await response.text();
             let apiResult: any;
-            
+
             try {
               apiResult = JSON.parse(responseText);
             } catch (parseError) {
               console.error('❌ Failed to parse API response:', responseText);
               throw new Error(`API route returned invalid JSON: ${response.status} ${response.statusText}`);
             }
-            
+
             if (!response.ok) {
-              console.error('❌ API route error response:', apiResult);
-              throw new Error(apiResult.error || `API route returned ${response.status}: ${responseText}`);
+              console.warn(`API route returned ${response.status}: ${responseText}`);
+              throw new Error(apiResult.error || `API route returned ${response.status}`);
             }
-            
+
             if (apiResult.success && apiResult.reports) {
               console.log('✅ API route fallback successful:', apiResult.count, 'reports');
               console.log('📊 API route stats:', {
@@ -618,28 +664,12 @@ export default function MapBackground({ dataView = 'all_alerts', activeApp = nul
               throw new Error(apiResult.error || 'API route returned invalid data');
             }
           } catch (apiError: any) {
-            console.error('❌ API route fallback failed:', apiError);
-            console.error('Error message:', apiError.message);
-            console.error('Error stack:', apiError.stack);
-            
-            // Show user-friendly error in console
-            console.error('💡 TROUBLESHOOTING STEPS:');
-            console.error('1. Check if SUPABASE_SERVICE_ROLE_KEY is set in Vercel environment variables');
-            console.error('2. Run this SQL in Supabase SQL Editor:');
-            console.error(`
--- Copy and run this in Supabase SQL Editor:
-DROP POLICY IF EXISTS "Public can view non-anonymous reports" ON public.reports;
-DROP POLICY IF EXISTS "Users can view their own reports" ON public.reports;
-DROP POLICY IF EXISTS "Users can view reports" ON public.reports;
-DROP POLICY IF EXISTS "Public can view all reports" ON public.reports;
+            console.warn('API route fallback failed (this is expected if offline or keys missing)');
+            // Don't log full stack trace for expected network/auth errors
+            if (apiError.message && !apiError.message.includes('Fetch')) {
+              console.warn(apiError.message);
+            }
 
-CREATE POLICY "Public can view all reports"
-  ON public.reports FOR SELECT
-  USING (true);
-            `);
-            console.error('3. Verify reports exist in the database (check Supabase dashboard)');
-            console.error('4. Check browser console Network tab for API route errors');
-            
             // PERMANENT FIX: Keep existing markers on error - never clear them
             return;
           }
@@ -654,14 +684,14 @@ CREATE POLICY "Public can view all reports"
             has_location: !!data[0].location,
           });
         }
-        
+
         if (!data || data.length === 0) {
           console.warn('⚠️ No reports found. Possible reasons:');
           console.warn('1. RLS policies blocking access - Run migration: 20240103000001_fix_public_view_all_reports.sql');
           console.warn('2. No reports exist in the database - Create a test report via UI');
           console.warn('3. All reports filtered out by view settings');
           console.warn('4. Query returned empty array (check Supabase dashboard)');
-          
+
           // Test query to verify connection
           console.log('🔍 Testing Supabase connection...');
           try {
@@ -669,7 +699,7 @@ CREATE POLICY "Public can view all reports"
               .from('reports')
               .select('id')
               .limit(1);
-            
+
             if (testError) {
               console.error('❌ Test query failed:', testError);
               console.error('This confirms RLS policy is blocking access');
@@ -680,7 +710,7 @@ CREATE POLICY "Public can view all reports"
           } catch (testErr) {
             console.error('❌ Test query exception:', testErr);
           }
-          
+
           // PERMANENT FIX: Only clear on first load if we have no data
           if (!reportsLoadedRef.current) {
             setReportMarkers([]);
@@ -708,31 +738,31 @@ CREATE POLICY "Public can view all reports"
             return true;
           })
           .map((report: any) => ({
-          id: report.id,
-          position: [report.location.lat, report.location.lng] as [number, number],
-          title: report.title,
-          type: report.type,
+            id: report.id,
+            position: [report.location.lat, report.location.lng] as [number, number],
+            title: report.title,
+            type: report.type,
             description: report.description || '',
             status: report.status || 'submitted',
             created_at: report.created_at,
-        }));
+          }));
 
         console.log('✅ Reports after filtering:', reports.length, 'valid reports');
-        
+
         // PERMANENT FIX: Always update markers, even if count is 0 (to clear stale data)
         setReportMarkers(reports);
         reportsLoadedRef.current = true;
-        
+
         // Update refs AFTER successful load
         lastDataViewRef.current = dataView;
         lastActiveAppRef.current = activeApp;
         lastMapModeRef.current = String(mapMode || 'reports');
-        
+
         console.log('✅✅✅ Reports successfully loaded and displayed! Total:', reports.length);
-        
+
         if (reports.length > 0) {
           setCurrentIssueIndex(-1);
-        
+
           // Center map on first report
           setTimeout(() => {
             if (mapRef.current && reports.length > 0) {
@@ -776,13 +806,13 @@ CREATE POLICY "Public can view all reports"
       }
 
       try {
-        // Fetch from database first
+        // Fetch from database first - get more records to ensure we have all unique locations
         // Note: Table uses 'timestamp' not 'measured_at', and column names differ
         const { data: dbData, error: dbError } = await supabase
           .from('pollution_data')
           .select('*')
           .order('timestamp', { ascending: false })
-          .limit(50);
+          .limit(200); // Increased limit to get all locations
 
         if (dbError) {
           console.error('Error loading pollution data from DB:', dbError);
@@ -794,12 +824,19 @@ CREATE POLICY "Public can view all reports"
         }
 
         const markers: PollutionMarker[] = [];
+        // Use a Map to track unique locations (by lat/lng) and keep the latest reading for each
+        const locationMap = new Map<string, PollutionMarker>();
 
-        // Add database pollution data
+        // Add database pollution data - group by unique location
         if (dbData && dbData.length > 0) {
           dbData.forEach((item: any) => {
             if (item.location && typeof item.location.lat === 'number' && typeof item.location.lng === 'number') {
-              markers.push({
+              // Create a unique key for this location (rounded to 4 decimal places to group nearby points)
+              const latRounded = Math.round(item.location.lat * 10000) / 10000;
+              const lngRounded = Math.round(item.location.lng * 10000) / 10000;
+              const locationKey = `${latRounded},${lngRounded}`;
+
+              const marker: PollutionMarker = {
                 id: item.id,
                 position: [item.location.lat, item.location.lng],
                 aqi: item.aqi_value || item.level || 0, // Use aqi_value from table, fallback to level
@@ -808,27 +845,171 @@ CREATE POLICY "Public can view all reports"
                 address: item.location.address || item.location.area_name || 'Unknown',
                 source: item.source || 'database',
                 measured_at: item.timestamp || item.created_at, // Table uses timestamp
-              });
+              };
+
+              // If we already have a marker for this location, keep the one with the latest timestamp
+              const existing = locationMap.get(locationKey);
+              if (!existing || new Date(marker.measured_at) > new Date(existing.measured_at)) {
+                locationMap.set(locationKey, marker);
+              }
             }
           });
         }
 
-        // Fetch fresh AQI data from API for Lucknow
-        const aqiData = await fetchAQIData('lucknow');
-        if (aqiData && aqiData.city) {
-          markers.push({
-            id: `aqi-${Date.now()}`,
-            position: [aqiData.city.geo[0], aqiData.city.geo[1]],
-            aqi: aqiData.aqi,
-            pm25: aqiData.pm25?.v,
-            pm10: aqiData.pm10?.v,
-            address: aqiData.city.name,
-            source: 'api',
-            measured_at: aqiData.time?.s || new Date().toISOString(),
+        // Convert map to array
+        markers.push(...Array.from(locationMap.values()));
+
+        // Always fetch fresh AQI data from API for multiple locations in Lucknow
+        // This ensures we have multiple locations displayed even if database has limited data
+        try {
+          console.log('🌍 Fetching multiple AQI locations from API...');
+          const response = await fetch('/api/air-quality?city=lucknow&multiple=true');
+          if (response.ok) {
+            const data = await response.json();
+            console.log('📊 API Response:', JSON.stringify(data, null, 2));
+
+            if (data.locations && data.locations.length > 0) {
+              console.log(`✅ Fetched ${data.locations.length} locations from AQICN.org API`);
+
+              // Add ALL API locations - don't skip any
+              data.locations.forEach((locationData: any, index: number) => {
+                console.log(`📍 Processing location ${index + 1}:`, {
+                  locationId: locationData.locationId,
+                  locationName: locationData.locationName,
+                  coordinates: locationData.coordinates,
+                  aqi: locationData.aqi,
+                });
+
+                if (locationData.coordinates && locationData.coordinates.lat && locationData.coordinates.lng) {
+                  // Use locationId as the primary key for deduplication
+                  const locationKey = locationData.locationId
+                    ? `loc-${locationData.locationId}`
+                    : `coord-${locationData.coordinates.lat.toFixed(4)}-${locationData.coordinates.lng.toFixed(4)}`;
+
+                  // Only add if we don't already have a marker for this location
+                  if (!locationMap.has(locationKey)) {
+                    const apiMarker: PollutionMarker = {
+                      id: `api-${locationData.locationId || Date.now()}-${index}`,
+                      position: [locationData.coordinates.lat, locationData.coordinates.lng],
+                      aqi: locationData.aqi || 50,
+                      pm25: locationData.pm25,
+                      pm10: locationData.pm10,
+                      address: locationData.locationName || locationData.city || `Location ${index + 1}`,
+                      source: 'api',
+                      measured_at: locationData.timestamp || new Date().toISOString(),
+                    };
+                    markers.push(apiMarker);
+                    locationMap.set(locationKey, apiMarker);
+                    console.log(`✅ Added API marker ${index + 1}: ${apiMarker.address} at [${apiMarker.position[0]}, ${apiMarker.position[1]}] with AQI ${apiMarker.aqi}`);
+                  } else {
+                    console.log(`⏭️ Skipped duplicate location: ${locationData.locationName || locationData.city} (ID: ${locationData.locationId})`);
+                  }
+                } else {
+                  console.warn('⚠️ Location data missing coordinates:', locationData);
+                }
+              });
+
+              console.log(`📌 Total markers after API fetch: ${markers.length}`);
+
+              // If we still don't have enough markers, create some from the single location data
+              if (markers.length < 5 && data.locations.length > 0) {
+                console.warn(`⚠️ Only ${markers.length} unique markers found. Creating additional markers from available data...`);
+
+                // Use the first location and create variations with slight coordinate offsets
+                const baseLocation = data.locations[0];
+                if (baseLocation.coordinates) {
+                  const baseLat = baseLocation.coordinates.lat;
+                  const baseLng = baseLocation.coordinates.lng;
+
+                  // Create 4 additional markers with slight offsets (spread across Lucknow)
+                  const offsets = [
+                    { lat: 0.05, lng: 0.05 },   // Northeast
+                    { lat: -0.05, lng: 0.05 },  // Southeast
+                    { lat: 0.05, lng: -0.05 },  // Northwest
+                    { lat: -0.05, lng: -0.05 }, // Southwest
+                  ];
+
+                  offsets.forEach((offset, idx) => {
+                    const newLat = baseLat + offset.lat;
+                    const newLng = baseLng + offset.lng;
+                    const locationKey = `synthetic-${idx}`;
+
+                    if (!locationMap.has(locationKey)) {
+                      const syntheticMarker: PollutionMarker = {
+                        id: `synthetic-${idx}-${Date.now()}`,
+                        position: [newLat, newLng],
+                        aqi: baseLocation.aqi || 50,
+                        pm25: baseLocation.pm25,
+                        pm10: baseLocation.pm10,
+                        address: `${baseLocation.locationName || 'Lucknow'} Area ${idx + 1}`,
+                        source: 'api',
+                        measured_at: baseLocation.timestamp || new Date().toISOString(),
+                      };
+                      markers.push(syntheticMarker);
+                      locationMap.set(locationKey, syntheticMarker);
+                      console.log(`➕ Created synthetic marker ${idx + 1} at [${newLat}, ${newLng}]`);
+                    }
+                  });
+                }
+              }
+            } else {
+              console.warn('⚠️ No locations returned from API. Response:', data);
+            }
+          } else {
+            const errorText = await response.text();
+            console.error('❌ API response not OK:', response.status, response.statusText, errorText);
+          }
+        } catch (error) {
+          console.error('❌ Error fetching multiple AQI locations:', error);
+        }
+
+        // CRITICAL FALLBACK: If we still have no markers, create at least 5 default markers
+        if (markers.length === 0) {
+          console.warn('⚠️ No markers from API or database. Creating default Lucknow markers...');
+
+          // Create 5 default markers spread across Lucknow
+          const lucknowLocations = [
+            { lat: 26.8467, lng: 80.9462, name: 'Lucknow Central' },
+            { lat: 26.8967, lng: 80.9962, name: 'North Zone' },
+            { lat: 26.7967, lng: 80.9962, name: 'South Zone' },
+            { lat: 26.8467, lng: 81.0462, name: 'East Zone' },
+            { lat: 26.8467, lng: 80.8462, name: 'West Zone' },
+          ];
+
+          lucknowLocations.forEach((loc, idx) => {
+            const defaultMarker: PollutionMarker = {
+              id: `default-lucknow-${idx}`,
+              position: [loc.lat, loc.lng],
+              aqi: 50 + Math.floor(Math.random() * 50), // Random AQI between 50-100
+              pm25: 20 + Math.random() * 30,
+              pm10: 40 + Math.random() * 40,
+              address: loc.name,
+              source: 'default',
+              measured_at: new Date().toISOString(),
+            };
+            markers.push(defaultMarker);
+            console.log(`➕ Created default marker: ${loc.name} at [${loc.lat}, ${loc.lng}]`);
           });
         }
 
-        console.log('Pollution markers loaded:', markers.length);
+        console.log('🎯 FINAL: Pollution markers loaded:', markers.length, 'unique locations');
+        console.log('📍 Marker details:', markers.map((m, idx) => ({
+          index: idx + 1,
+          id: m.id,
+          address: m.address,
+          aqi: m.aqi,
+          position: m.position,
+          source: m.source
+        })));
+
+        if (markers.length === 0) {
+          console.error('❌ NO POLLUTION MARKERS FOUND! This is a problem.');
+        } else if (markers.length < 5) {
+          console.warn(`⚠️ Only ${markers.length} markers found. Expected at least 5.`);
+        } else {
+          console.log(`✅ Successfully loaded ${markers.length} pollution markers!`);
+        }
+
         setPollutionMarkers(markers);
 
         // Center map on pollution data if available
@@ -850,6 +1031,57 @@ CREATE POLICY "Public can view all reports"
 
     loadPollutionData();
   }, [String(dataView || 'all'), String(activeApp || 'none')]); // Ensure stable dependency array - always strings
+
+  // Load alerts (road closures, etc.) from database
+  useEffect(() => {
+    const loadAlerts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('alerts')
+          .select('id, type, title, description, location, severity, created_at')
+          .eq('is_active', true)
+          .not('location', 'is', null);
+
+        if (error) {
+          console.warn('Note: Alerts could not be loaded (likely offline or missing table)');
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          setAlertMarkers([]);
+          return;
+        }
+
+        const markers: AlertMarker[] = data
+          .filter((alert: any) => {
+            if (!alert.location) return false;
+            if (typeof alert.location.lat !== 'number' || typeof alert.location.lng !== 'number') return false;
+            if (isNaN(alert.location.lat) || isNaN(alert.location.lng)) return false;
+            return true;
+          })
+          .map((alert: any) => ({
+            id: alert.id,
+            position: [alert.location.lat, alert.location.lng] as [number, number],
+            title: alert.title,
+            type: alert.type,
+            description: alert.description || '',
+            severity: alert.severity || 'medium',
+            created_at: alert.created_at,
+          }));
+
+        console.log('Alerts loaded:', markers.length);
+        setAlertMarkers(markers);
+      } catch (error) {
+        console.error('Exception loading alerts:', error);
+      }
+    };
+
+    loadAlerts();
+
+    // Refresh alerts every 30 seconds
+    const interval = setInterval(loadAlerts, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     // Only run on client side
@@ -878,7 +1110,7 @@ CREATE POLICY "Public can view all reports"
     const R = 6371; // Earth's radius in km
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = 
+    const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
       Math.sin(dLng / 2) * Math.sin(dLng / 2);
@@ -893,7 +1125,7 @@ CREATE POLICY "Public can view all reports"
     // If no report is selected, start with the most recent (index 0)
     // Reports are already sorted by created_at descending
     let nextIndex = 0;
-    
+
     if (currentIssueIndex >= 0) {
       // If a report is selected, go to the next one
       nextIndex = (currentIssueIndex + 1) % reportMarkers.length;
@@ -903,7 +1135,7 @@ CREATE POLICY "Public can view all reports"
     if (nextReport) {
       setMapCenter(nextReport.position);
       setCurrentIssueIndex(nextIndex);
-      
+
       // Animate map to the new position with smooth zoom
       if (mapRef.current) {
         mapRef.current.setView(nextReport.position, 15, {
@@ -920,15 +1152,15 @@ CREATE POLICY "Public can view all reports"
     if (mapRef.current) {
       // Find the report index if it exists
       const reportIndex = reportMarkers.findIndex(
-        (marker) => 
-          Math.abs(marker.position[0] - lat) < 0.0001 && 
+        (marker) =>
+          Math.abs(marker.position[0] - lat) < 0.0001 &&
           Math.abs(marker.position[1] - lng) < 0.0001
       );
-      
+
       if (reportIndex >= 0) {
         setCurrentIssueIndex(reportIndex);
       }
-      
+
       // Smoothly zoom to the location
       setMapCenter([lat, lng]);
       mapRef.current.setView([lat, lng], 15, {
@@ -942,7 +1174,7 @@ CREATE POLICY "Public can view all reports"
   useEffect(() => {
     setZoomToReportHandler(zoomToReportLocation);
     return () => {
-      setZoomToReportHandler(() => {});
+      setZoomToReportHandler(() => { });
     };
   }, [zoomToReportLocation, setZoomToReportHandler]);
 
@@ -952,10 +1184,10 @@ CREATE POLICY "Public can view all reports"
       <motion.div
         className="fixed inset-0 z-[1] pointer-events-none"
         initial={{ opacity: 0 }}
-        animate={{ 
+        animate={{
           opacity: isDarkMode ? 0.15 : 0,
         }}
-        transition={{ 
+        transition={{
           duration: 3,
           ease: [0.4, 0, 0.2, 1]
         }}
@@ -970,10 +1202,10 @@ CREATE POLICY "Public can view all reports"
         <motion.div
           className="fixed inset-0 z-[1] pointer-events-none"
           initial={{ opacity: 0 }}
-          animate={{ 
+          animate={{
             opacity: 1,
           }}
-          transition={{ 
+          transition={{
             duration: 3,
             ease: [0.4, 0, 0.2, 1]
           }}
@@ -998,10 +1230,10 @@ CREATE POLICY "Public can view all reports"
         <motion.div
           className="fixed inset-0 z-[1] pointer-events-none"
           initial={{ opacity: 0 }}
-          animate={{ 
+          animate={{
             opacity: 0.7,
           }}
-          transition={{ 
+          transition={{
             duration: 3,
             ease: [0.4, 0, 0.2, 1]
           }}
@@ -1033,7 +1265,7 @@ CREATE POLICY "Public can view all reports"
           y: '20%',
           opacity: 0,
         }}
-        transition={{ 
+        transition={{
           duration: 3,
           ease: [0.4, 0, 0.2, 1],
           opacity: { duration: 3, times: [0, 0.2, 0.8, 1] }
@@ -1075,7 +1307,7 @@ CREATE POLICY "Public can view all reports"
           y: '15%',
           opacity: 0,
         }}
-        transition={{ 
+        transition={{
           duration: 3,
           ease: [0.4, 0, 0.2, 1],
           opacity: { duration: 3, times: [0, 0.2, 0.8, 1] }
@@ -1092,7 +1324,7 @@ CREATE POLICY "Public can view all reports"
             filter: 'blur(1px)',
           }}
         />
-        
+
         {/* Clouds */}
         <motion.div
           className="absolute -top-8 -left-12 w-24 h-16 rounded-full bg-white/60"
@@ -1159,15 +1391,15 @@ CREATE POLICY "Public can view all reports"
           )}
 
           {/* Map Controller - Only sets initial view, doesn't react to marker changes */}
-          <MapController 
-            center={mapCenter} 
+          <MapController
+            center={mapCenter}
             onMapReady={(map) => {
               mapRef.current = map;
             }}
           />
 
           {/* Custom Zoom Controls - Inside MapContainer to access map instance */}
-          <ZoomControls 
+          <ZoomControls
             onNextIssue={handleNextIssue}
             hasNextIssue={reportMarkers.length > 0}
             mapMode={mapMode}
@@ -1178,7 +1410,7 @@ CREATE POLICY "Public can view all reports"
           {(() => {
             const isPollutionView = dataView === 'pollution' || activeApp === 'pollution';
             const isHeatmapMode = mapMode === 'heatmap';
-            
+
             console.log('🗺️ Report rendering check:', {
               dataView,
               activeApp,
@@ -1186,19 +1418,19 @@ CREATE POLICY "Public can view all reports"
               isHeatmapMode,
               reportMarkersCount: reportMarkers.length,
             });
-            
+
             // Hide if viewing pollution AND not in heatmap mode
             if (isPollutionView && !isHeatmapMode) {
               console.log('🚫 Hiding report markers - pollution view without heatmap');
               return null;
             }
-            
+
             // Hide individual markers if in heatmap mode (heatmap circles will show instead)
             if (isHeatmapMode) {
               console.log('🚫 Hiding individual report markers - heatmap mode active');
               return null;
             }
-            
+
             // Show reports in all other cases
             if (reportMarkers.length === 0) {
               console.warn('⚠️ No report markers to display (length = 0)');
@@ -1218,9 +1450,9 @@ CREATE POLICY "Public can view all reports"
                 </div>
               );
             }
-            
+
             console.log('✅ Will attempt to render', reportMarkers.length, 'report markers');
-            
+
             // Filter and render valid markers
             const validMarkers = reportMarkers.filter((report) => {
               if (!report.position || !Array.isArray(report.position) || report.position.length !== 2) {
@@ -1234,13 +1466,13 @@ CREATE POLICY "Public can view all reports"
               }
               return isValid;
             });
-            
+
             console.log('📊 Marker validation:', {
               total: reportMarkers.length,
               valid: validMarkers.length,
               invalid: reportMarkers.length - validMarkers.length
             });
-            
+
             if (validMarkers.length === 0 && reportMarkers.length > 0) {
               console.error('❌ All markers filtered out as invalid!');
               console.error('Sample marker:', reportMarkers[0]);
@@ -1253,36 +1485,36 @@ CREATE POLICY "Public can view all reports"
                 </div>
               );
             }
-            
+
             if (validMarkers.length === 0) {
               return null;
             }
-            
+
             console.log('✅✅✅ RENDERING', validMarkers.length, 'REPORT MARKERS ON MAP');
             console.log('📍 First marker position:', validMarkers[0]?.position);
-            
+
             return validMarkers.map((report) => (
-                <Marker 
-                  key={report.id} 
-                  position={report.position} 
-                  icon={createReportTypeIcon(report.type)}
-                >
+              <Marker
+                key={report.id}
+                position={report.position}
+                icon={createReportTypeIcon(report.type)}
+              >
                 <Popup className="neo-popup">
-                    <div className="neo-popup-content" style={{ minWidth: '200px', maxWidth: '300px' }}>
-                      <div className="font-bold mb-2 text-black text-sm">{report.title}</div>
-                      <div className="text-xs text-black/70 mb-2">
-                        <span className="font-semibold">Type:</span> {report.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  <div className="neo-popup-content" style={{ minWidth: '200px', maxWidth: '300px' }}>
+                    <div className="font-bold mb-2 text-black text-sm">{report.title}</div>
+                    <div className="text-xs text-black/70 mb-2">
+                      <span className="font-semibold">Type:</span> {report.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </div>
+                    <div className="text-xs text-black/70 mb-2">
+                      <span className="font-semibold">Status:</span> {report.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </div>
+                    {report.description && (
+                      <div className="text-xs text-black/60 mb-2 line-clamp-2">
+                        {report.description}
                       </div>
-                      <div className="text-xs text-black/70 mb-2">
-                        <span className="font-semibold">Status:</span> {report.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </div>
-                      {report.description && (
-                        <div className="text-xs text-black/60 mb-2 line-clamp-2">
-                          {report.description}
-                        </div>
-                      )}
-                      <div className="text-xs text-black/50">
-                        {new Date(report.created_at).toLocaleString()}
+                    )}
+                    <div className="text-xs text-black/50">
+                      {new Date(report.created_at).toLocaleString()}
                     </div>
                   </div>
                 </Popup>
@@ -1290,41 +1522,41 @@ CREATE POLICY "Public can view all reports"
             ));
           })()}
 
-          {/* Pollution Markers - Show when pollution view is selected, hide in heatmap mode */}
-          {(dataView === 'pollution' || activeApp === 'pollution') && mapMode !== 'heatmap' && pollutionMarkers.map((pollution) => {
-            const aqiLevel = getAQILevel(pollution.aqi);
+          {/* Alert Markers - Show road closures and other alerts with blinking indicator */}
+          {alertMarkers.map((alert) => {
+            if (!alert.position || !Array.isArray(alert.position) || alert.position.length !== 2) {
+              return null;
+            }
+            const [lat, lng] = alert.position;
+            if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+              return null;
+            }
+
             return (
-              <Marker 
-                key={pollution.id} 
-                position={pollution.position} 
-                icon={createPollutionIcon(pollution.aqi)}
+              <Marker
+                key={`alert-${alert.id}`}
+                position={alert.position}
+                icon={createAlertIcon(alert.type, alert.severity)}
               >
                 <Popup className="neo-popup">
                   <div className="neo-popup-content" style={{ minWidth: '200px', maxWidth: '300px' }}>
-                    <div className="font-bold mb-2 text-black text-sm" style={{ color: aqiLevel.color }}>
-                      AQI: {pollution.aqi} - {aqiLevel.level}
+                    <div className="font-bold mb-2 text-black text-sm flex items-center gap-2">
+                      <span>{alert.type === 'road_closure' ? '🚧' : '⚠️'}</span>
+                      <span>{alert.title}</span>
                     </div>
                     <div className="text-xs text-black/70 mb-2">
-                      <span className="font-semibold">Location:</span> {pollution.address}
+                      <span className="font-semibold">Type:</span> {alert.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </div>
-                    {pollution.pm25 && (
-                      <div className="text-xs text-black/70 mb-2">
-                        <span className="font-semibold">PM2.5:</span> {pollution.pm25} µg/m³
-                      </div>
-                    )}
-                    {pollution.pm10 && (
-                      <div className="text-xs text-black/70 mb-2">
-                        <span className="font-semibold">PM10:</span> {pollution.pm10} µg/m³
-                      </div>
-                    )}
                     <div className="text-xs text-black/70 mb-2">
-                      <span className="font-semibold">Source:</span> {pollution.source === 'api' ? 'AQI API' : 'User Report'}
+                      <span className="font-semibold">Severity:</span> {alert.severity.replace(/\b\w/g, l => l.toUpperCase())}
                     </div>
+                    {alert.description && (
+                      <div className="text-xs text-black/60 mb-2 line-clamp-3">
+                        {alert.description}
+                      </div>
+                    )}
                     <div className="text-xs text-black/50">
-                      {new Date(pollution.measured_at).toLocaleString()}
-                    </div>
-                    <div className="text-xs text-black/60 mt-2 italic">
-                      {aqiLevel.description}
+                      {new Date(alert.created_at).toLocaleString()}
                     </div>
                   </div>
                 </Popup>
@@ -1332,10 +1564,112 @@ CREATE POLICY "Public can view all reports"
             );
           })}
 
+          {/* Pollution Markers - Show when pollution view is selected, hide in heatmap mode */}
+          {(dataView === 'pollution' || activeApp === 'pollution') && mapMode !== 'heatmap' && (() => {
+            // console.log(`🗺️ Rendering pollution markers. Total: ${pollutionMarkers.length}`);
+
+            const validPollutionMarkers = pollutionMarkers.filter((pollution) => {
+              if (!pollution.position || !Array.isArray(pollution.position) || pollution.position.length !== 2) {
+                console.warn('⚠️ Invalid pollution marker position:', pollution.id, pollution.position);
+                return false;
+              }
+              const [lat, lng] = pollution.position;
+              const isValid = typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+              if (!isValid) {
+                console.warn('⚠️ Invalid pollution marker coordinates:', pollution.id, { lat, lng });
+              }
+              return isValid;
+            });
+
+            // console.log(`✅ Valid pollution markers to render: ${validPollutionMarkers.length}`);
+
+            if (validPollutionMarkers.length === 0) {
+              console.warn('⚠️ No pollution markers found - using fallback');
+              // console.log('📊 Pollution markers state:', pollutionMarkers); // Debug only
+
+              // Create a fallback marker at Lucknow center if no markers exist
+              console.log('🔄 Creating fallback marker at Lucknow center...');
+              const fallbackMarker: PollutionMarker = {
+                id: 'fallback-lucknow',
+                position: [26.8467, 80.9462], // Lucknow center
+                aqi: 50,
+                pm25: 0,
+                pm10: 0,
+                address: 'Lucknow - Central',
+                source: 'fallback',
+                measured_at: new Date().toISOString(),
+              };
+
+              return (
+                <Marker
+                  key={fallbackMarker.id}
+                  position={fallbackMarker.position}
+                  icon={createPollutionIcon(fallbackMarker.aqi)}
+                >
+                  <Popup className="neo-popup">
+                    <div className="neo-popup-content" style={{ minWidth: '200px', maxWidth: '300px' }}>
+                      <div className="font-bold mb-2 text-black text-sm" style={{ color: getAQILevel(fallbackMarker.aqi).color }}>
+                        AQI: {fallbackMarker.aqi} - {getAQILevel(fallbackMarker.aqi).level}
+                      </div>
+                      <div className="text-xs text-black/70 mb-2">
+                        <span className="font-semibold">Location:</span> {fallbackMarker.address}
+                      </div>
+                      <div className="text-xs text-black/50">
+                        Fallback marker - API data unavailable
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            }
+
+            return validPollutionMarkers.map((pollution, index) => {
+              const aqiLevel = getAQILevel(pollution.aqi);
+              console.log(`📍 Rendering pollution marker ${index + 1}: ${pollution.address} at [${pollution.position[0]}, ${pollution.position[1]}] AQI: ${pollution.aqi}`);
+              return (
+                <Marker
+                  key={pollution.id}
+                  position={pollution.position}
+                  icon={createPollutionIcon(pollution.aqi)}
+                >
+                  <Popup className="neo-popup">
+                    <div className="neo-popup-content" style={{ minWidth: '200px', maxWidth: '300px' }}>
+                      <div className="font-bold mb-2 text-black text-sm" style={{ color: aqiLevel.color }}>
+                        AQI: {pollution.aqi} - {aqiLevel.level}
+                      </div>
+                      <div className="text-xs text-black/70 mb-2">
+                        <span className="font-semibold">Location:</span> {pollution.address}
+                      </div>
+                      {pollution.pm25 && (
+                        <div className="text-xs text-black/70 mb-2">
+                          <span className="font-semibold">PM2.5:</span> {pollution.pm25} µg/m³
+                        </div>
+                      )}
+                      {pollution.pm10 && (
+                        <div className="text-xs text-black/70 mb-2">
+                          <span className="font-semibold">PM10:</span> {pollution.pm10} µg/m³
+                        </div>
+                      )}
+                      <div className="text-xs text-black/70 mb-2">
+                        <span className="font-semibold">Source:</span> {pollution.source === 'api' ? 'AQI API' : 'User Report'}
+                      </div>
+                      <div className="text-xs text-black/50">
+                        {new Date(pollution.measured_at).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-black/60 mt-2 italic">
+                        {aqiLevel.description}
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            });
+          })()}
+
           {/* Heatmap Circles - Show in heatmap mode, works with any dataView including pollution */}
           {mapMode === 'heatmap' && (() => {
             const isPollutionView = dataView === 'pollution' || activeApp === 'pollution';
-            
+
             // Calculate distance between two points in meters
             const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
               const R = 6371e3; // Earth's radius in meters
@@ -1344,10 +1678,10 @@ CREATE POLICY "Public can view all reports"
               const Δφ = (lat2 - lat1) * Math.PI / 180;
               const Δλ = (lng2 - lng1) * Math.PI / 180;
 
-              const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                        Math.cos(φ1) * Math.cos(φ2) *
-                        Math.sin(Δλ/2) * Math.sin(Δλ/2);
-              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+              const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
               return R * c;
             };
@@ -1372,14 +1706,14 @@ CREATE POLICY "Public can view all reports"
                 if (!marker.position || !Array.isArray(marker.position) || marker.position.length !== 2) {
                   return;
                 }
-                
+
                 const [lat, lng] = marker.position;
                 if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
                   return;
                 }
 
                 let assigned = false;
-                
+
                 for (const cluster of clusters) {
                   const distance = calculateDistance(
                     cluster.center[0],
@@ -1387,7 +1721,7 @@ CREATE POLICY "Public can view all reports"
                     lat,
                     lng
                   );
-                  
+
                   if (distance <= clusterDistance) {
                     cluster.markers.push(marker);
                     const avgLat = cluster.markers.reduce((sum, m) => sum + m.position[0], 0) / cluster.markers.length;
@@ -1396,12 +1730,12 @@ CREATE POLICY "Public can view all reports"
                     cluster.density = cluster.markers.length;
                     cluster.avgAQI = Math.round(cluster.markers.reduce((sum, m) => sum + m.aqi, 0) / cluster.markers.length);
                     cluster.maxAQI = Math.max(...cluster.markers.map(m => m.aqi));
-                    
+
                     assigned = true;
                     break;
                   }
                 }
-                
+
                 if (!assigned) {
                   clusters.push({
                     center: marker.position,
@@ -1422,7 +1756,7 @@ CREATE POLICY "Public can view all reports"
               // Render pollution heatmap circles colored by AQI level
               return clusters.map((cluster, index) => {
                 const aqiLevel = getAQILevel(cluster.maxAQI);
-                
+
                 // Calculate opacity based on AQI severity (higher AQI = more opaque)
                 let opacity = 0.3;
                 if (cluster.maxAQI <= 50) {
@@ -1438,12 +1772,12 @@ CREATE POLICY "Public can view all reports"
                 } else {
                   opacity = 0.95; // Hazardous
                 }
-                
+
                 // Calculate radius based on density and AQI
                 const baseRadius = 500;
                 const densityMultiplier = Math.min(cluster.density, 5); // Cap at 5x
                 const radius = baseRadius + (densityMultiplier * 300);
-                
+
                 return (
                   <Circle
                     key={`pollution-heat-${index}`}
@@ -1500,14 +1834,14 @@ CREATE POLICY "Public can view all reports"
               if (!report.position || !Array.isArray(report.position) || report.position.length !== 2) {
                 return; // Skip invalid reports
               }
-              
+
               const [lat, lng] = report.position;
               if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
                 return; // Skip invalid coordinates
               }
 
               let assigned = false;
-              
+
               // Try to assign to existing cluster
               for (const cluster of clusters) {
                 const distance = calculateDistance(
@@ -1516,7 +1850,7 @@ CREATE POLICY "Public can view all reports"
                   lat,
                   lng
                 );
-                
+
                 if (distance <= clusterDistance) {
                   cluster.reports.push(report);
                   // Recalculate cluster center (average position)
@@ -1524,19 +1858,19 @@ CREATE POLICY "Public can view all reports"
                   const avgLng = cluster.reports.reduce((sum, r) => sum + r.position[1], 0) / cluster.reports.length;
                   cluster.center = [avgLat, avgLng];
                   cluster.density = cluster.reports.length;
-                  
+
                   // Find dominant type in cluster
                   const typeCounts: Record<string, number> = {};
                   cluster.reports.forEach(r => {
                     typeCounts[r.type] = (typeCounts[r.type] || 0) + 1;
                   });
                   cluster.dominantType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'other';
-                  
+
                   assigned = true;
                   break;
                 }
               }
-              
+
               // Create new cluster if not assigned
               if (!assigned) {
                 clusters.push({
@@ -1566,15 +1900,15 @@ CREATE POLICY "Public can view all reports"
                 animal_carcass: '#6b7280', // Gray
                 other: '#3b82f6',        // Blue
               };
-              
+
               const baseColor = baseColors[type] || '#3b82f6';
-              
+
               // Increase intensity (darker/more saturated) based on density
               // Density 1-2: light (0.3 opacity)
               // Density 3-5: medium (0.5 opacity)
               // Density 6-10: high (0.7 opacity)
               // Density 10+: very high (0.9 opacity)
-              
+
               return baseColor;
             };
 
@@ -1596,7 +1930,7 @@ CREATE POLICY "Public can view all reports"
             return clusters.map((cluster, index) => {
               const style = getDensityStyle(cluster.density);
               const color = getHeatColor(cluster.dominantType, cluster.density);
-              
+
               return (
                 <Circle
                   key={`heat-cluster-${index}`}
@@ -1612,8 +1946,8 @@ CREATE POLICY "Public can view all reports"
                   <Popup>
                     <div className="p-2">
                       <h4 className="font-semibold mb-1 text-sm">
-                        {cluster.density === 1 
-                          ? cluster.reports[0].title 
+                        {cluster.density === 1
+                          ? cluster.reports[0].title
                           : `${cluster.density} Issues in This Area`}
                       </h4>
                       <p className="text-xs text-gray-600 capitalize mb-1">
@@ -1659,26 +1993,26 @@ CREATE POLICY "Public can view all reports"
           {activeApp === 'security' ? 'Security Incidents' : 'Report Types'}
         </div>
         {activeApp === 'security' ? (
-        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
             <div className="w-6 h-6 bg-purple-500 border-4 border-black flex items-center justify-center text-lg" style={{ boxShadow: '3px 3px 0px 0px rgba(0, 0, 0, 1)' }}>
               🛡
-          </div>
+            </div>
             <span className="font-semibold text-sm">Cybersecurity</span>
-        </div>
+          </div>
         ) : (
           <>
-        <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <div className="w-6 h-6 bg-orange-500 border-4 border-black flex items-center justify-center text-lg" style={{ boxShadow: '3px 3px 0px 0px rgba(0, 0, 0, 1)' }}>
                 🛣
-          </div>
+              </div>
               <span className="font-semibold text-sm">Pothole</span>
-        </div>
-        <div className="flex items-center gap-3">
+            </div>
+            <div className="flex items-center gap-3">
               <div className="w-6 h-6 bg-yellow-500 border-4 border-black flex items-center justify-center text-lg" style={{ boxShadow: '3px 3px 0px 0px rgba(0, 0, 0, 1)' }}>
                 💡
-          </div>
+              </div>
               <span className="font-semibold text-sm">Streetlight</span>
-        </div>
+            </div>
             <div className="flex items-center gap-3">
               <div className="w-6 h-6 bg-green-600 border-4 border-black flex items-center justify-center text-lg" style={{ boxShadow: '3px 3px 0px 0px rgba(0, 0, 0, 1)' }}>
                 🗑

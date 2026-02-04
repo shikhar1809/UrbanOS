@@ -1,16 +1,18 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { 
-  FileText, 
-  Users, 
-  TrendingUp, 
-  ShieldCheck, 
-  Megaphone, 
+import {
+  FileText,
+  Users,
+  TrendingUp,
+  ShieldCheck,
+  Megaphone,
   UserCircle,
   Bell,
   Wind,
-  Shield
+  Shield,
+  Bot,
+  Globe
 } from 'lucide-react';
 import { useOS, AppId } from '@/lib/os-context';
 import { useAuth } from '@/lib/auth-context';
@@ -31,6 +33,8 @@ const apps: AppIcon[] = [
   { id: 'pollution', icon: Wind, label: 'Pollution', color: 'from-cyan-500 to-teal-500' },
   { id: 'admin', icon: Shield, label: 'Admin', color: 'from-red-600 to-red-800' },
   { id: 'alerts', icon: Megaphone, label: 'Alerts', color: 'from-orange-500 to-red-500' },
+  { id: 'chat', icon: Bot, label: 'Nagar Mitra', color: 'from-green-500 to-emerald-500' },
+  { id: 'monitor', icon: Globe, label: 'City Monitor', color: 'from-indigo-500 to-purple-500' },
   { id: 'profile', icon: UserCircle, label: 'Profile', color: 'from-gray-500 to-gray-700' },
 ];
 
@@ -60,9 +64,9 @@ export default function Taskbar() {
       className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-2 pointer-events-none"
     >
       <div className="glass-effect rounded-2xl px-5 py-3 shadow-2xl pointer-events-auto border-2 border-white/30 backdrop-blur-xl bg-white/70 dark:bg-windows-dark/80"
-           style={{
-             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-           }}>
+        style={{
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+        }}>
         <div className="flex items-center gap-2">
           {/* App Icons */}
           <div className="flex items-center gap-1">
@@ -79,11 +83,10 @@ export default function Taskbar() {
                   whileTap={{ scale: 0.95 }}
                 >
                   <div
-                    className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 shadow-lg ${
-                      isActive
-                        ? `bg-gradient-to-br ${app.color} border-2 border-white/40`
-                        : 'bg-white/20 dark:bg-white/10 hover:bg-white/30 dark:hover:bg-white/20 border-2 border-transparent'
-                    }`}
+                    className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 shadow-lg ${isActive
+                      ? `bg-gradient-to-br ${app.color} border-2 border-white/40`
+                      : 'bg-white/20 dark:bg-white/10 hover:bg-white/30 dark:hover:bg-white/20 border-2 border-transparent'
+                      }`}
                   >
                     <Icon
                       className={`w-7 h-7 ${isActive ? 'text-white drop-shadow-lg' : 'text-foreground'}`}

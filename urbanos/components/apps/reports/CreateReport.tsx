@@ -10,6 +10,7 @@ import { handleError, logError } from '@/lib/error-handler';
 import { getAuthoritiesByTypeAndLocation, Authority } from '@/lib/services/authority-tagger';
 
 const LocationPicker = dynamic(() => import('./LocationPicker'), { ssr: false });
+import VoiceInput from './VoiceInput';
 
 interface CreateReportProps {
   onSuccess: () => void;
@@ -29,7 +30,7 @@ const issueTypes = [
 ];
 
 export default function CreateReport({ onSuccess }: CreateReportProps) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [type, setType] = useState<string>('pothole');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -57,7 +58,7 @@ export default function CreateReport({ onSuccess }: CreateReportProps) {
 
   const loadAuthorities = async () => {
     if (!location) return;
-    
+
     setLoadingAuthorities(true);
     try {
       const auths = await getAuthoritiesByTypeAndLocation(type, location);
@@ -96,7 +97,7 @@ export default function CreateReport({ onSuccess }: CreateReportProps) {
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const maxSize = 50 * 1024 * 1024; // 50MB limit
-    
+
     for (const file of files) {
       if (file.size > maxSize) {
         setError(`Video ${file.name} is too large. Maximum size is 50MB.`);
@@ -140,29 +141,48 @@ export default function CreateReport({ onSuccess }: CreateReportProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+
+    // Wait for auth to finish loading
+    if (authLoading) {
+      showToast('Please wait while we load your account...', 'info');
+      return;
+    }
+
+    // Get current user - must be signed in to submit reports
+    let currentUser = user;
+    if (!currentUser) {
+      // Try to get session directly
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        currentUser = session.user;
+      } else {
+        // User is not signed in - prompt them to sign in
+        showToast('Please sign in to submit a report.', 'error');
+        return;
+      }
+    }
 
     // Client-side validation
     if (!title.trim()) {
       setError('Please enter a title for your report');
       return;
     }
-    
+
     if (title.trim().length < 3) {
       setError('Title must be at least 3 characters long');
       return;
     }
-    
+
     if (!description.trim()) {
       setError('Please enter a description for your report');
       return;
     }
-    
+
     if (description.trim().length < 10) {
       setError('Description must be at least 10 characters long');
       return;
     }
-    
+
     if (!location) {
       setError('Please select a location on the map');
       return;
@@ -174,74 +194,44 @@ export default function CreateReport({ onSuccess }: CreateReportProps) {
     try {
       // Ensure user profile exists in public.users
       // This is necessary because reports.user_id references public.users(id)
-      let profileExists = false;
-      
-      try {
-        const { data: existingProfile, error: profileCheckError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('id', user.id)
-          .maybeSingle();
+      const { data: existingProfile, error: profileCheckError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', currentUser.id)
+        .maybeSingle();
 
-        if (profileCheckError) {
-          // Log but don't throw - we'll try to create the profile anyway
-          console.warn('Error checking profile:', profileCheckError);
-        } else if (existingProfile) {
-          profileExists = true;
-        }
-      } catch (err) {
-        console.warn('Exception checking profile:', err);
-      }
-
-      // If profile doesn't exist, create it using the database function
-      // This function has SECURITY DEFINER and can bypass RLS
-      if (!profileExists) {
-        // Extract user information from auth user
-        const userEmail = user.email || user.user_metadata?.email || '';
-        const userName = user.user_metadata?.full_name || 
-                        user.user_metadata?.name || 
-                        user.user_metadata?.display_name ||
-                        (userEmail ? userEmail.split('@')[0] : 'User');
+      // If profile doesn't exist, create it via API route
+      if (!existingProfile && !profileCheckError) {
+        const userEmail = currentUser.email || currentUser.user_metadata?.email || '';
+        const userName = currentUser.user_metadata?.full_name ||
+          currentUser.user_metadata?.name ||
+          currentUser.user_metadata?.username ||
+          currentUser.user_metadata?.display_name ||
+          (userEmail ? userEmail.split('@')[0] : 'User');
 
         if (!userEmail) {
           throw new Error('User email is required. Please sign in again.');
         }
 
-        // Use the database function to create the profile
-        // This function has SECURITY DEFINER and can bypass RLS
-        const { error: createProfileError } = await supabase.rpc('create_user_profile', {
-          p_user_id: user.id,
-          p_email: userEmail,
-          p_full_name: userName || null,
-          p_role: 'citizen',
+        // Use API route to create profile (handles RLS properly)
+        const response = await fetch('/api/auth/create-profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            email: userEmail,
+            username: userName,
+          }),
         });
 
-        if (createProfileError) {
-          // Log full error details for debugging
-          console.error('Failed to create user profile:', {
-            code: createProfileError.code,
-            message: createProfileError.message,
-            details: createProfileError.details,
-            hint: createProfileError.hint,
-            user_id: user.id,
-            user_email: userEmail,
-          });
-          logError(createProfileError, 'CreateReport.createProfile');
-          
-          // Provide more helpful error message
-          let errorMsg = 'Failed to create user profile. ';
-          if (createProfileError.code === '42501') {
-            errorMsg += 'Permission denied. Please contact support.';
-          } else if (createProfileError.code === '23503') {
-            errorMsg += 'User not found in authentication system. Please sign in again.';
-          } else if (createProfileError.message) {
-            errorMsg += createProfileError.message;
-          } else {
-            errorMsg += 'Please try again or contact support.';
-          }
-          throw new Error(errorMsg);
-        } else {
-          console.log('User profile created successfully');
+        if (!response.ok) {
+          const data = await response.json();
+          console.error('Failed to create user profile via API:', data);
+          // Don't throw - profile might be created by trigger anyway
+          // Wait a moment and check again
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
 
@@ -249,7 +239,7 @@ export default function CreateReport({ onSuccess }: CreateReportProps) {
       const imageUrls: string[] = [];
       for (const image of images) {
         const fileExt = image.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}-${Math.random()}.${fileExt}`;
+        const fileName = `${currentUser.id}/${Date.now()}-${Math.random()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('report-images')
           .upload(fileName, image);
@@ -267,7 +257,7 @@ export default function CreateReport({ onSuccess }: CreateReportProps) {
       const videoUrls: string[] = [];
       for (const video of videos) {
         const fileExt = video.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}-${Math.random()}.${fileExt}`;
+        const fileName = `${currentUser.id}/${Date.now()}-${Math.random()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('report-videos')
           .upload(fileName, video);
@@ -291,7 +281,7 @@ export default function CreateReport({ onSuccess }: CreateReportProps) {
       };
 
       const { error: insertError } = await supabase.from('reports').insert({
-        user_id: user.id,
+        user_id: currentUser.id,
         type,
         title,
         description,
@@ -326,6 +316,18 @@ export default function CreateReport({ onSuccess }: CreateReportProps) {
     }
   };
 
+  // Show loading state if auth is still loading
+  if (authLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-windows-blue mx-auto mb-4" />
+          <p className="text-foreground/70">Loading your account...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-6">
@@ -335,6 +337,27 @@ export default function CreateReport({ onSuccess }: CreateReportProps) {
             <p className="text-red-500 text-sm">{error}</p>
           </div>
         )}
+
+        {/* AI Voice Input */}
+        <VoiceInput
+          onAnalysisComplete={(data: any) => {
+            if (data.title) setTitle(data.title);
+            if (data.description) setDescription(data.description);
+            if (data.type) {
+              // Map AI type to our types
+              const mapType = (aiType: string) => {
+                const normalized = aiType.toLowerCase();
+                if (normalized.includes('pothole') || normalized.includes('road')) return 'pothole';
+                if (normalized.includes('light')) return 'streetlight';
+                if (normalized.includes('garbage') || normalized.includes('trash') || normalized.includes('waste')) return 'garbage';
+                if (normalized.includes('animal')) return 'animal_carcass';
+                if (normalized.includes('cyber')) return 'cyber';
+                return 'other';
+              };
+              setType(mapType(data.type));
+            }
+          }}
+        />
 
         {/* Issue Type */}
         <div>
@@ -540,13 +563,18 @@ export default function CreateReport({ onSuccess }: CreateReportProps) {
         {/* Submit */}
         <button
           type="submit"
-          disabled={loading || !location}
+          disabled={loading || !location || authLoading || !user}
           className="w-full py-4 bg-windows-blue text-white rounded-lg font-semibold hover:bg-windows-blue-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {loading ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
               Submitting...
+            </>
+          ) : authLoading || !user ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Loading account...
             </>
           ) : (
             'Submit Report'

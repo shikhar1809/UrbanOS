@@ -5,7 +5,6 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { Shield, AlertTriangle, Eye, EyeOff, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
-import AuthModal from '@/components/auth/AuthModal';
 import dynamic from 'next/dynamic';
 
 const LocationPicker = dynamic(() => import('@/components/apps/reports/LocationPicker'), { ssr: false });
@@ -34,23 +33,43 @@ const incidentTypes = [
 ];
 
 export default function SecurityApp() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [view, setView] = useState<'report' | 'alerts'>('report');
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [selectedType, setSelectedType] = useState('phishing');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingAlerts, setLoadingAlerts] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [alerts, setAlerts] = useState<SecurityIncident[]>([]);
-  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
     if (user) {
-      createDemoIncidentsIfNeeded();
+      // Fire and forget - don't block UI on demo data creation
+      // Realtime subscription will pick up changes when they are inserted
+      createDemoIncidentsIfNeeded().catch(console.error);
+
       loadAlerts();
-      subscribeToAlerts();
+
+      const unsubscribe = subscribeToAlerts();
+
+      // Safety timeout to prevent infinite loading
+      const safetyTimeout = setTimeout(() => {
+        setLoadingAlerts((current) => {
+          if (current) {
+            console.warn('Force clearing loading state after timeout');
+            return false;
+          }
+          return current;
+        });
+      }, 10000);
+
+      return () => {
+        if (unsubscribe) unsubscribe();
+        clearTimeout(safetyTimeout);
+      };
     }
   }, [user]);
 
@@ -70,10 +89,14 @@ export default function SecurityApp() {
         return;
       }
 
+      console.log('Existing incidents check:', existing);
+
       // If incidents exist, don't create new ones
       if (existing && existing.length > 0) {
         return;
       }
+
+      console.log('Creating demo incidents...');
 
       // Create demo cybersecurity incidents (not anonymous so they show on map)
       const demoIncidents = [
@@ -194,8 +217,15 @@ export default function SecurityApp() {
   };
 
   const loadAlerts = async () => {
+    if (!user) {
+      setLoadingAlerts(false);
+      return;
+    }
+
+    setLoadingAlerts(true);
     try {
       // Load recent cybersecurity incidents (anonymized)
+      // Use OR syntax for multiple values if IN causes issues, or check raw response
       const { data, error } = await supabase
         .from('reports')
         .select('*')
@@ -203,14 +233,23 @@ export default function SecurityApp() {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      if (error) throw error;
-      setAlerts(data || []);
-    } catch (error) {
+      if (error) {
+        console.error('Error loading alerts:', error);
+        setError('Failed to load alerts: ' + error.message);
+      } else {
+        setAlerts(data || []);
+      }
+    } catch (error: any) {
       console.error('Error loading alerts:', error);
+      setError('Failed to load alerts: ' + (error.message || 'Unknown error'));
+    } finally {
+      setLoadingAlerts(false);
     }
   };
 
   const subscribeToAlerts = () => {
+    if (!user) return;
+
     const channel = supabase
       .channel('security_alerts')
       .on(
@@ -235,7 +274,7 @@ export default function SecurityApp() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      setShowAuthModal(true);
+      setError('Please wait for demo user to load...');
       return;
     }
 
@@ -275,26 +314,17 @@ export default function SecurityApp() {
     }
   };
 
-  if (!user) {
+  if (authLoading || !user) {
     return (
-      <>
-        <div className="p-6 flex items-center justify-center min-h-[400px]">
-          <div className="text-center max-w-md">
-            <Shield className="w-16 h-16 text-purple-500 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold mb-4">Sign In Required</h3>
-            <p className="text-foreground/70 mb-6">
-              Please sign in to report security incidents and receive alerts.
-            </p>
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="px-8 py-3 bg-windows-blue text-white rounded-lg font-semibold hover:bg-windows-blue-hover transition-colors"
-            >
-              Sign In
-            </button>
-          </div>
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center max-w-md">
+          <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <h3 className="text-2xl font-bold mb-4">Loading...</h3>
+          <p className="text-foreground/70 mb-6">
+            Please wait while we load your demo account.
+          </p>
         </div>
-        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
-      </>
+      </div>
     );
   }
 
@@ -310,21 +340,19 @@ export default function SecurityApp() {
           <div className="flex gap-2">
             <button
               onClick={() => setView('report')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                view === 'report'
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-foreground/10 hover:bg-foreground/20'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${view === 'report'
+                ? 'bg-purple-500 text-white'
+                : 'bg-foreground/10 hover:bg-foreground/20'
+                }`}
             >
               Report Incident
             </button>
             <button
               onClick={() => setView('alerts')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                view === 'alerts'
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-foreground/10 hover:bg-foreground/20'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${view === 'alerts'
+                ? 'bg-purple-500 text-white'
+                : 'bg-foreground/10 hover:bg-foreground/20'
+                }`}
             >
               View Alerts
             </button>
@@ -376,14 +404,12 @@ export default function SecurityApp() {
                   <button
                     type="button"
                     onClick={() => setIsAnonymous(!isAnonymous)}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
-                      isAnonymous ? 'bg-purple-500' : 'bg-foreground/20'
-                    }`}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${isAnonymous ? 'bg-purple-500' : 'bg-foreground/20'
+                      }`}
                   >
                     <div
-                      className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                        isAnonymous ? 'translate-x-6' : 'translate-x-0'
-                      }`}
+                      className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${isAnonymous ? 'translate-x-6' : 'translate-x-0'
+                        }`}
                     />
                   </button>
                 </div>
@@ -471,10 +497,24 @@ export default function SecurityApp() {
           <div className="p-6">
             <div className="max-w-4xl mx-auto">
               <h4 className="text-lg font-semibold mb-4">Recent Security Alerts</h4>
-              {alerts.length === 0 ? (
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start gap-3 mb-4">
+                  <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-red-500 text-sm">{error}</p>
+                </div>
+              )}
+              {loadingAlerts ? (
+                <div className="bg-foreground/5 rounded-xl p-8 text-center">
+                  <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                  <p className="text-foreground/50">Loading security alerts...</p>
+                </div>
+              ) : alerts.length === 0 ? (
                 <div className="bg-foreground/5 rounded-xl p-8 text-center">
                   <Shield className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
                   <p className="text-foreground/50">No recent security alerts</p>
+                  <p className="text-xs text-foreground/40 mt-2">
+                    Security alerts will appear here when incidents are reported
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">

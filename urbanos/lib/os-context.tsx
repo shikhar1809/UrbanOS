@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
 
-export type AppId = 'reports' | 'community' | 'predictor' | 'security' | 'profile' | 'notifications' | 'alerts' | 'pollution' | 'admin';
+export type AppId = 'reports' | 'community' | 'predictor' | 'security' | 'profile' | 'notifications' | 'alerts' | 'pollution' | 'admin' | 'chat' | 'monitor';
 
 interface OSContextType {
   activeApp: AppId | null;

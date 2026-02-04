@@ -316,6 +316,27 @@ html.lenis {
   animation: shimmer 1.5s infinite;
 }
 
+/* Alert Marker Blinking Animation */
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+.alert-marker-wrapper {
+  background: transparent !important;
+  border: none !important;
+}
+
+.alert-marker {
+  animation: blink 1s infinite;
+}
+
 /* CRT Monitor Gradient */
 .bg-gradient-radial {
   background: radial-gradient(circle, var(--tw-gradient-stops));

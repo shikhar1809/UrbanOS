@@ -8,7 +8,6 @@ import CreateReport from './reports/CreateReport';
 import ReportsList from './reports/ReportsList';
 import CommunityReportsList from './reports/CommunityReportsList';
 import AgencyDashboard from './reports/AgencyDashboard';
-import AuthModal from '@/components/auth/AuthModal';
 import { useToast } from '@/lib/toast-context';
 import { handleError, logError } from '@/lib/error-handler';
 import { AlertCircle, FileText, Plus, List, Award } from 'lucide-react';
@@ -19,7 +18,6 @@ export default function ReportsApp() {
   const [reports, setReports] = useState<Report[]>([]);
   const [allReports, setAllReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -281,8 +279,7 @@ export default function ReportsApp() {
     };
   };
 
-  // Show sign-in prompt only for create/my reports views, but allow viewing all reports publicly
-  const showSignInPrompt = !user && (view === 'create' || view === 'my');
+  // Demo mode - user is always available
 
   return (
     <div className="h-full flex flex-col">
@@ -301,50 +298,28 @@ export default function ReportsApp() {
 
         {/* Navigation Tabs */}
         <div className="flex gap-2 mt-4 flex-wrap">
-          {/* Create button - requires login */}
-          {user ? (
-            <button
-              onClick={() => setView('create')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                view === 'create'
-                  ? 'bg-windows-blue text-white'
-                  : 'bg-foreground/10 hover:bg-foreground/20'
-              }`}
-            >
-              <Plus className="w-4 h-4" />
-              Create Report
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-foreground/10 hover:bg-foreground/20"
-            >
-              <Plus className="w-4 h-4" />
-              Create Report (Sign In)
-            </button>
-          )}
-          {/* My Reports button - requires login */}
-          {user ? (
-            <button
-              onClick={() => setView('my')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                view === 'my'
-                  ? 'bg-windows-blue text-white'
-                  : 'bg-foreground/10 hover:bg-foreground/20'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              My Reports
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-foreground/10 hover:bg-foreground/20"
-            >
-              <FileText className="w-4 h-4" />
-              My Reports (Sign In)
-            </button>
-          )}
+          <button
+            onClick={() => setView('create')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              view === 'create'
+                ? 'bg-windows-blue text-white'
+                : 'bg-foreground/10 hover:bg-foreground/20'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            Create Report
+          </button>
+          <button
+            onClick={() => setView('my')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              view === 'my'
+                ? 'bg-windows-blue text-white'
+                : 'bg-foreground/10 hover:bg-foreground/20'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            My Reports
+          </button>
           <button
             onClick={() => setView('all')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
@@ -388,21 +363,6 @@ export default function ReportsApp() {
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin w-8 h-8 border-4 border-windows-blue border-t-transparent rounded-full"></div>
           </div>
-        ) : showSignInPrompt ? (
-          <div className="p-6 flex items-center justify-center min-h-[400px]">
-            <div className="text-center max-w-md">
-              <h3 className="text-2xl font-bold mb-4">Sign In Required</h3>
-              <p className="text-foreground/70 mb-6">
-                Please sign in to {view === 'create' ? 'create reports' : 'view your reports'}.
-              </p>
-              <button
-                onClick={() => setShowAuthModal(true)}
-                className="px-8 py-3 bg-windows-blue text-white rounded-lg font-semibold hover:bg-windows-blue-hover transition-colors"
-              >
-                Sign In
-              </button>
-            </div>
-          </div>
         ) : view === 'create' ? (
           <CreateReport onSuccess={() => setView('my')} />
         ) : view === 'my' ? (
@@ -420,7 +380,6 @@ export default function ReportsApp() {
           <ReportsList reports={allReports} showFilter="all" />
         )}
       </div>
-      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </div>
   );
 }

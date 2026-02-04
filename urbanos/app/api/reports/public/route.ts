@@ -19,29 +19,30 @@ export async function GET(request: NextRequest) {
 
     if (!supabaseUrl) {
       console.error('Missing NEXT_PUBLIC_SUPABASE_URL');
-      return NextResponse.json(
-        { error: 'Server configuration error: Missing Supabase URL' },
-        { status: 500 }
-      );
+      return NextResponse.json({
+        success: false,
+        reports: [],
+        error: 'Server configuration error: Missing Supabase URL'
+      });
     }
 
     if (!serviceRoleKey) {
       console.error('Missing SUPABASE_SERVICE_ROLE_KEY - API route fallback will not work');
-      console.error('Please set SUPABASE_SERVICE_ROLE_KEY in Vercel environment variables');
       // Still try with anon key as fallback (might work if RLS allows)
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       if (!anonKey) {
-        return NextResponse.json(
-          { error: 'Server configuration error: Missing Supabase keys' },
-          { status: 500 }
-        );
+        return NextResponse.json({
+          success: false,
+          reports: [],
+          error: 'Server configuration error: Missing Supabase keys'
+        });
       }
       console.warn('Using anon key instead of service role key - RLS may still block access');
     }
 
     // Create Supabase client with service role key (bypasses RLS) or anon key as fallback
     const supabase = createClient(
-      supabaseUrl, 
+      supabaseUrl,
       serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         auth: {
@@ -69,10 +70,11 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching reports (service role):', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch reports', details: error.message },
-        { status: 500 }
-      );
+      return NextResponse.json({
+        success: false,
+        reports: [],
+        error: error.message || 'Failed to fetch reports'
+      });
     }
 
     // Filter out reports with invalid locations
@@ -88,7 +90,7 @@ export async function GET(request: NextRequest) {
     });
 
     console.log(`✅ Public reports API: Found ${validReports.length} valid reports out of ${(data || []).length} total`);
-    
+
     if (validReports.length === 0 && (data || []).length > 0) {
       console.warn('⚠️ Some reports have invalid locations and were filtered out');
     }
@@ -102,10 +104,11 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Exception in public reports API:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      reports: [],
+      error: error.message || 'Internal server error'
+    });
   }
 }
 

@@ -25,11 +25,11 @@ export default function WeatherDisplay() {
         setLoading(true);
         // Use our API route to fetch weather (avoids CORS issues)
         const response = await fetch('/api/weather');
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch weather');
         }
-        
+
         const weatherData = await response.json();
         setWeather(weatherData);
       } catch (err: any) {
@@ -48,9 +48,9 @@ export default function WeatherDisplay() {
 
   const getWeatherIcon = () => {
     if (!weather) return null;
-    
+
     const condition = weather.condition.toLowerCase();
-    
+
     // Map weather conditions to icons
     if (condition.includes('snow')) {
       return <CloudSnow className="w-8 h-8 text-blue-300" strokeWidth={2.5} />;
@@ -65,9 +65,9 @@ export default function WeatherDisplay() {
     }
   };
 
-  const isRaining = weather?.condition.toLowerCase().includes('rain') || 
-                    weather?.condition.toLowerCase().includes('drizzle') ||
-                    weather?.condition.toLowerCase().includes('thunderstorm');
+  const isRaining = weather?.condition.toLowerCase().includes('rain') ||
+    weather?.condition.toLowerCase().includes('drizzle') ||
+    weather?.condition.toLowerCase().includes('thunderstorm');
 
   if (loading) {
     return (
@@ -93,20 +93,20 @@ export default function WeatherDisplay() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="flex flex-col items-center gap-2 text-white"
+        className="flex flex-col items-center gap-2 text-white bg-black/40 backdrop-blur-sm p-4 rounded-xl border border-white/10"
       >
         {/* Big Weather Emoji */}
         <div className="text-6xl md:text-7xl leading-none">
           {weather.emoji}
         </div>
-        
+
         {/* Temperature - Big */}
         <div className="text-4xl md:text-5xl font-bold leading-tight">
           {weather.temp}°C
         </div>
-        
+
         {/* Weather Description */}
-        <div className="text-sm md:text-base font-medium text-white/90 capitalize text-center px-2">
+        <div className="text-sm md:text-base font-medium text-white/90 capitalize text-center px-1">
           {weather.description}
         </div>
       </motion.div>
@@ -145,7 +145,7 @@ function RainEffect() {
           }}
         />
       ))}
-      
+
       {/* Additional rain drops for more density */}
       {Array.from({ length: 50 }).map((_, i) => (
         <motion.div

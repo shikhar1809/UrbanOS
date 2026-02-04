@@ -52,7 +52,7 @@ export default function ReportVoting({
 
   const handleVote = async (voteType: 'upvote' | 'downvote') => {
     if (!user) {
-      showToast('Please sign in to vote', 'error');
+      showToast('Please wait for demo user to load...', 'error');
       return;
     }
 

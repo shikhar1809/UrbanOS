@@ -226,8 +226,8 @@ export default function ReportsList({ reports, showFilter = 'all' }: ReportsList
   const handlePromoteToCommunityReport = async (reportId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent opening report detail modal
     
-    if (!user) {
-      showToast('Please sign in to promote reports', 'error');
+      if (!user) {
+        showToast('Please wait for demo user to load...', 'error');
       return;
     }
 

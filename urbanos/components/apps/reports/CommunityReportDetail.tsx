@@ -76,7 +76,7 @@ export default function CommunityReportDetail({
 
   const handleGenerateBriefDocument = async () => {
     if (!user) {
-      showToast('Please sign in to generate documents', 'error');
+      showToast('Please wait for demo user to load...', 'error');
       return;
     }
 

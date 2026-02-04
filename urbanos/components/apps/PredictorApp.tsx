@@ -87,7 +87,26 @@ export default function PredictorApp() {
       setRiskZones(zones);
 
       // Generate predictions using ALL reports (normal + cybersecurity)
-      const predictions = generatePredictions(allReports, zones);
+      // First try to get AI predictions
+      let predictions: PredictedAlert[] = [];
+      try {
+        const response = await fetch('/api/predictor/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reports: allReports }),
+        });
+        const data = await response.json();
+        if (data.success && Array.isArray(data.predictions) && data.predictions.length > 0) {
+          predictions = data.predictions;
+        } else {
+          // Fallback to hardcoded rules if AI fails or returns empty
+          predictions = generatePredictions(allReports, zones);
+        }
+      } catch (err) {
+        console.error('Failed to get AI predictions, falling back to rules:', err);
+        predictions = generatePredictions(allReports, zones);
+      }
+
       setPredictedAlerts(predictions);
 
       // Create notifications for high-priority predictions
@@ -110,7 +129,7 @@ export default function PredictorApp() {
 
     incidents.forEach((incident) => {
       if (!incident.location || typeof incident.location.lat !== 'number') return;
-      
+
       const lat = Math.round(incident.location.lat * 100) / 100;
       const lng = Math.round(incident.location.lng * 100) / 100;
       const key = `${lat},${lng}`;
@@ -158,10 +177,10 @@ export default function PredictorApp() {
     // 1. Seasonal/Time-based Predictions
     // Christmas/Holiday Fraud Warning (November-December)
     if (currentMonth === 10 || currentMonth === 11) {
-      const daysUntilChristmas = currentMonth === 10 
-        ? 30 - currentDate + 25 
+      const daysUntilChristmas = currentMonth === 10
+        ? 30 - currentDate + 25
         : 25 - currentDate;
-      
+
       if (daysUntilChristmas <= 30 && daysUntilChristmas > 0) {
         predictions.push({
           id: 'xmas-fraud',
@@ -224,7 +243,7 @@ export default function PredictorApp() {
 
     // 3. Pattern-based Predictions
     // Road Accessibility Issues
-    const roadReports = reports.filter(r => 
+    const roadReports = reports.filter(r =>
       r.type === 'pothole' || r.type === 'road_safety_hazards'
     );
     if (roadReports.length >= 3) {
@@ -271,10 +290,10 @@ export default function PredictorApp() {
     // 4. Time-based Predictions (Weekend/Evening patterns)
     const dayOfWeek = now.getDay();
     const hour = now.getHours();
-    
+
     // Weekend traffic/accessibility issues
     if ((dayOfWeek === 5 || dayOfWeek === 6) && hour >= 17) {
-      const trafficReports = reports.filter(r => 
+      const trafficReports = reports.filter(r =>
         r.type === 'pothole' || r.type === 'road_safety_hazards'
       );
       if (trafficReports.length > 0) {
@@ -300,7 +319,7 @@ export default function PredictorApp() {
 
     try {
       // Only create notifications for high and medium severity predictions
-      const importantPredictions = predictions.filter(p => 
+      const importantPredictions = predictions.filter(p =>
         p.severity === 'high' || p.severity === 'medium'
       );
 
@@ -404,22 +423,20 @@ export default function PredictorApp() {
                 {predictedAlerts.map((alert) => (
                   <div
                     key={alert.id}
-                    className={`p-4 rounded-lg border-2 ${
-                      alert.severity === 'high'
+                    className={`p-4 rounded-lg border-2 ${alert.severity === 'high'
                         ? 'bg-red-500/10 border-red-500/30'
                         : alert.severity === 'medium'
-                        ? 'bg-yellow-500/10 border-yellow-500/30'
-                        : 'bg-blue-500/10 border-blue-500/30'
-                    }`}
+                          ? 'bg-yellow-500/10 border-yellow-500/30'
+                          : 'bg-blue-500/10 border-blue-500/30'
+                      }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded ${
-                        alert.severity === 'high'
+                      <div className={`p-2 rounded ${alert.severity === 'high'
                           ? 'bg-red-500/20'
                           : alert.severity === 'medium'
-                          ? 'bg-yellow-500/20'
-                          : 'bg-blue-500/20'
-                      }`}>
+                            ? 'bg-yellow-500/20'
+                            : 'bg-blue-500/20'
+                        }`}>
                         {alert.type === 'seasonal' && <Calendar className="w-4 h-4" />}
                         {alert.type === 'location' && <MapPin className="w-4 h-4" />}
                         {alert.type === 'pattern' && <TrendingUp className="w-4 h-4" />}
@@ -428,13 +445,12 @@ export default function PredictorApp() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <h5 className="font-semibold">{alert.title}</h5>
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            alert.severity === 'high'
+                          <span className={`px-2 py-0.5 rounded text-xs ${alert.severity === 'high'
                               ? 'bg-red-500/20 text-red-500'
                               : alert.severity === 'medium'
-                              ? 'bg-yellow-500/20 text-yellow-500'
-                              : 'bg-blue-500/20 text-blue-500'
-                          }`}>
+                                ? 'bg-yellow-500/20 text-yellow-500'
+                                : 'bg-blue-500/20 text-blue-500'
+                            }`}>
                             {alert.severity.toUpperCase()}
                           </span>
                         </div>
@@ -480,21 +496,19 @@ export default function PredictorApp() {
               </div>
               <div className="text-lg font-bold capitalize">{stats.mostCommonType}</div>
             </div>
-            <div className={`rounded-xl p-4 ${
-              stats.recentTrend === 'increasing'
+            <div className={`rounded-xl p-4 ${stats.recentTrend === 'increasing'
                 ? 'bg-red-500/10'
                 : stats.recentTrend === 'decreasing'
-                ? 'bg-green-500/10'
-                : 'bg-foreground/5'
-            }`}>
+                  ? 'bg-green-500/10'
+                  : 'bg-foreground/5'
+              }`}>
               <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className={`w-4 h-4 ${
-                  stats.recentTrend === 'increasing'
+                <TrendingUp className={`w-4 h-4 ${stats.recentTrend === 'increasing'
                     ? 'text-red-500'
                     : stats.recentTrend === 'decreasing'
-                    ? 'text-green-500'
-                    : 'text-foreground/50'
-                }`} />
+                      ? 'text-green-500'
+                      : 'text-foreground/50'
+                  }`} />
                 <span className="text-sm text-foreground/70">Trend</span>
               </div>
               <div className="text-lg font-bold capitalize">{stats.recentTrend}</div>

@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabase';
 import { Notification } from '@/types';
 import { Bell, BellOff, CheckCheck, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import AuthModal from '@/components/auth/AuthModal';
 import { useToast } from '@/lib/toast-context';
 import { handleError, logError } from '@/lib/error-handler';
 
@@ -16,7 +15,6 @@ export default function NotificationsApp() {
   const { setNotifications } = useOS();
   const [notifications, setNotificationsState] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -141,24 +139,15 @@ export default function NotificationsApp() {
 
   if (!user) {
     return (
-      <>
-        <div className="p-6 flex items-center justify-center min-h-[400px]">
-          <div className="text-center max-w-md">
-            <Bell className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold mb-4">Sign In Required</h3>
-            <p className="text-foreground/70 mb-6">
-              Please sign in to view your notifications.
-            </p>
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="px-8 py-3 bg-windows-blue text-white rounded-lg font-semibold hover:bg-windows-blue-hover transition-colors"
-            >
-              Sign In
-            </button>
-          </div>
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center max-w-md">
+          <Bell className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
+          <h3 className="text-2xl font-bold mb-4">Loading...</h3>
+          <p className="text-foreground/70 mb-6">
+            Please wait while we load your demo account.
+          </p>
         </div>
-        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
-      </>
+      </div>
     );
   }
 

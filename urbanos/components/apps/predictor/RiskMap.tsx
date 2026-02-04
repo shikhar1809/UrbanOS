@@ -1,12 +1,30 @@
 'use client';
 
-import { MapContainer, TileLayer, Circle, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Circle, Marker, Popup, useMapEvents } from 'react-leaflet';
 import { RiskZone, HistoricalIncident } from '@/types';
 import L from 'leaflet';
 
 interface RiskMapProps {
   riskZones: RiskZone[];
   incidents: HistoricalIncident[];
+  onMapMove?: (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }, zoom: number) => void;
+}
+
+// Component to handle map events
+function MapEvents({ onMove }: { onMove: (bounds: any, zoom: number) => void }) {
+  const map = useMapEvents({
+    moveend: () => {
+      const bounds = map.getBounds();
+      const zoom = map.getZoom();
+      onMove({
+        minLat: bounds.getSouth(),
+        maxLat: bounds.getNorth(),
+        minLng: bounds.getWest(),
+        maxLng: bounds.getEast(),
+      }, zoom);
+    },
+  });
+  return null;
 }
 
 const getRiskColor = (level: 'low' | 'medium' | 'high') => {
@@ -22,7 +40,7 @@ const getRiskColor = (level: 'low' | 'medium' | 'high') => {
   }
 };
 
-export default function RiskMap({ riskZones, incidents }: RiskMapProps) {
+export default function RiskMap({ riskZones, incidents, onMapMove }: RiskMapProps) {
   // Default center - Lucknow, India
   const defaultCenter: [number, number] = [26.8467, 80.9462]; // Lucknow
 
@@ -30,9 +48,9 @@ export default function RiskMap({ riskZones, incidents }: RiskMapProps) {
   const center: [number, number] =
     riskZones.length > 0
       ? [
-          riskZones.reduce((sum, z) => sum + z.location.lat, 0) / riskZones.length,
-          riskZones.reduce((sum, z) => sum + z.location.lng, 0) / riskZones.length,
-        ]
+        riskZones.reduce((sum, z) => sum + z.location.lat, 0) / riskZones.length,
+        riskZones.reduce((sum, z) => sum + z.location.lng, 0) / riskZones.length,
+      ]
       : defaultCenter;
 
   return (
@@ -43,6 +61,7 @@ export default function RiskMap({ riskZones, incidents }: RiskMapProps) {
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
       >
+        {onMapMove && <MapEvents onMove={onMapMove} />}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -78,9 +97,8 @@ export default function RiskMap({ riskZones, incidents }: RiskMapProps) {
             position={[incident.location.lat, incident.location.lng]}
             icon={L.divIcon({
               className: 'custom-marker',
-              html: `<div style="width: 8px; height: 8px; background-color: ${
-                incident.severity === 'high' ? '#ef4444' : incident.severity === 'medium' ? '#f59e0b' : '#10b981'
-              }; border-radius: 50%; border: 2px solid white;"></div>`,
+              html: `<div style="width: 8px; height: 8px; background-color: ${incident.severity === 'high' ? '#ef4444' : incident.severity === 'medium' ? '#f59e0b' : '#10b981'
+                }; border-radius: 50%; border: 2px solid white;"></div>`,
               iconSize: [12, 12],
             })}
           >

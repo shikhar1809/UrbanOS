@@ -1,4 +1,4 @@
-// AQI API integration using data.gov.in API
+// AQI API integration using AQICN.org API
 export interface AQIData {
   aqi: number;
   pm25?: { v: number; aqi?: number };
@@ -22,14 +22,14 @@ export interface AQIResponse {
 }
 
 /**
- * Fetch AQI data for a city from data.gov.in API (via our API route)
+ * Fetch AQI data for a city from AQICN.org API (via our API route)
  * @param city - City name (e.g., 'lucknow', 'delhi')
  * @returns AQI data or null if error
  */
 export async function fetchAQIData(city: string = 'lucknow'): Promise<AQIData | null> {
   try {
     // Use our API route to fetch air quality data (avoids CORS issues)
-    const response = await fetch('/api/air-quality');
+    const response = await fetch(`/api/air-quality?city=${encodeURIComponent(city)}`);
     
     if (!response.ok) {
       console.error('Air Quality API error:', response.status, response.statusText);
@@ -40,16 +40,39 @@ export async function fetchAQIData(city: string = 'lucknow'): Promise<AQIData | 
     
     // Transform our API response to match the expected AQIData format
     if (data && data.aqi !== undefined) {
+      // Use coordinates from API response or default to Lucknow
+      const coordinates = data.coordinates 
+        ? [data.coordinates.lat, data.coordinates.lng]
+        : [26.8467, 80.9462]; // Lucknow default
+
       return {
         aqi: data.aqi,
-        pm25: data.pm25 ? { v: data.pm25, aqi: data.aqi } : undefined,
-        pm10: data.pm10 ? { v: data.pm10, aqi: data.aqi } : undefined,
-        o3: data.o3 ? { v: data.o3, aqi: data.aqi } : undefined,
-        no2: data.no2 ? { v: data.no2, aqi: data.aqi } : undefined,
-        so2: data.so2 ? { v: data.so2, aqi: data.aqi } : undefined,
-        co: data.co ? { v: data.co, aqi: data.aqi } : undefined,
+        pm25: data.pm25 ? { 
+          v: data.pm25, 
+          aqi: data.pm25_aqi || data.aqi 
+        } : undefined,
+        pm10: data.pm10 ? { 
+          v: data.pm10, 
+          aqi: data.pm10_aqi || data.aqi 
+        } : undefined,
+        o3: data.o3 ? { 
+          v: data.o3, 
+          aqi: data.aqi 
+        } : undefined,
+        no2: data.no2 ? { 
+          v: data.no2, 
+          aqi: data.aqi 
+        } : undefined,
+        so2: data.so2 ? { 
+          v: data.so2, 
+          aqi: data.aqi 
+        } : undefined,
+        co: data.co ? { 
+          v: data.co, 
+          aqi: data.aqi 
+        } : undefined,
         city: {
-          geo: [26.8467, 80.9462], // Lucknow coordinates
+          geo: coordinates as [number, number],
           name: data.city || city,
         },
         time: {

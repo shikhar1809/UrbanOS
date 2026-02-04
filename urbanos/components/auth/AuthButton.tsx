@@ -1,15 +1,28 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { LogIn, LogOut, User } from 'lucide-react';
+import { User, LogOut, LogIn } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useState } from 'react';
 import AuthModal from './AuthModal';
+import { useToast } from '@/lib/toast-context';
 
 export default function AuthButton() {
-  const { user, profile, signOut, loading } = useAuth();
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const { user, profile, loading, signOut } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const { showToast } = useToast();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      setShowMenu(false);
+      showToast('Signed out successfully', 'success');
+    } catch (error: any) {
+      console.error('Error signing out:', error);
+      showToast('Failed to sign out', 'error');
+    }
+  };
 
   if (loading) {
     return (
@@ -17,12 +30,13 @@ export default function AuthButton() {
     );
   }
 
+  // If user is not signed in, show sign in button
   if (!user) {
     return (
       <>
         <motion.button
           onClick={() => setShowAuthModal(true)}
-          className="px-8 py-3 bg-white text-black rounded font-black uppercase text-sm tracking-tight flex items-center gap-2"
+          className="px-4 py-2 rounded bg-[#7FDBDB] neo-border flex items-center justify-center gap-2 font-bold text-black"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
@@ -41,6 +55,7 @@ export default function AuthButton() {
         className="w-12 h-12 rounded bg-[#7FDBDB] neo-border flex items-center justify-center"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
+        title={profile?.full_name || user.email || 'User'}
       >
         <User className="w-6 h-6 text-black" strokeWidth={3} />
       </motion.button>
@@ -58,23 +73,22 @@ export default function AuthButton() {
           >
             <div className="p-4 border-b-4 border-black bg-[#D4C5A9]">
               <div className="font-black text-black uppercase text-sm">
-                {profile?.full_name || 'User'}
+                {profile?.full_name || user.email?.split('@')[0] || 'User'}
               </div>
-              <div className="text-xs text-black font-bold mt-1">{user.email}</div>
+              <div className="text-xs text-black font-bold mt-1">{user?.email || ''}</div>
               <div className="text-xs font-bold mt-1 capitalize bg-black text-white px-2 py-1 inline-block rounded">
                 {profile?.role || 'citizen'}
               </div>
             </div>
-            <button
-              onClick={() => {
-                signOut();
-                setShowMenu(false);
-              }}
-              className="w-full px-4 py-3 text-left bg-[#E85D75] hover:bg-[#d14963] transition-colors flex items-center gap-2 text-white font-black uppercase text-sm border-t-4 border-black"
-            >
-              <LogOut className="w-4 h-4" strokeWidth={3} />
-              Sign Out
-            </button>
+            <div className="p-2">
+              <button
+                onClick={handleSignOut}
+                className="w-full px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors"
+              >
+                <LogOut className="w-4 h-4" strokeWidth={3} />
+                Sign Out
+              </button>
+            </div>
           </motion.div>
         </>
       )}

@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
  * Handles anonymous/system user creation for WhatsApp reports
  */
 
-const SYSTEM_USER_EMAIL = 'whatsapp@urbanos.local';
+const SYSTEM_USER_EMAIL = 'whatsapp@example.com';
 const SYSTEM_USER_NAME = 'WhatsApp User';
 
 /**

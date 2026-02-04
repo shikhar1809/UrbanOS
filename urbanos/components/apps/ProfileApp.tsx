@@ -5,16 +5,13 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { User, Mail, MapPin, Briefcase, Save, Bell, Moon, Sun } from 'lucide-react';
 import { motion } from 'framer-motion';
-import AuthModal from '@/components/auth/AuthModal';
 
 export default function ProfileApp() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [fullName, setFullName] = useState('');
   const [region, setRegion] = useState('');
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notificationPrefs, setNotificationPrefs] = useState({
     reportUpdates: true,
@@ -26,8 +23,13 @@ export default function ProfileApp() {
     if (profile) {
       setFullName(profile.full_name || '');
       setRegion(profile.region || '');
+    } else if (user) {
+      // If profile is not loaded but user exists, try to load it
+      // Use user metadata as fallback
+      setFullName(user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0] || 'User');
+      setRegion('');
     }
-  }, [profile]);
+  }, [profile, user]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,27 +57,33 @@ export default function ProfileApp() {
       setSaving(false);
     }
   };
+  
+  if (!user && authLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center max-w-md">
+          <User className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
+          <h3 className="text-2xl font-bold mb-4">Loading...</h3>
+          <p className="text-foreground/70 mb-6">
+            Please wait while we sign you in.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
+  // If no user after loading, show error
   if (!user) {
     return (
-      <>
-        <div className="p-6 flex items-center justify-center min-h-[400px]">
-          <div className="text-center max-w-md">
-            <User className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold mb-4">Sign In Required</h3>
-            <p className="text-foreground/70 mb-6">
-              Please sign in to view and edit your profile.
-            </p>
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="px-8 py-3 bg-windows-blue text-white rounded-lg font-semibold hover:bg-windows-blue-hover transition-colors"
-            >
-              Sign In
-            </button>
-          </div>
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center max-w-md">
+          <User className="w-16 h-16 text-foreground/20 mx-auto mb-4" />
+          <h3 className="text-2xl font-bold mb-4">Demo User</h3>
+          <p className="text-foreground/70 mb-6">
+            Demo user: test123
+          </p>
         </div>
-        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
-      </>
+      </div>
     );
   }
 
@@ -87,11 +95,13 @@ export default function ProfileApp() {
           <div className="bg-gradient-to-br from-windows-blue to-accent-gradient-start rounded-xl p-8 text-white">
             <div className="flex items-center gap-6">
               <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-3xl font-bold">
-                {(profile?.full_name || user.email || 'U').charAt(0).toUpperCase()}
+                {(profile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0] || 'U').charAt(0).toUpperCase()}
               </div>
               <div>
-                <h2 className="text-2xl font-bold mb-1">{profile?.full_name || 'User'}</h2>
-                <p className="text-white/80">{user.email}</p>
+                <h2 className="text-2xl font-bold mb-1">
+                  {profile?.full_name || user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0] || 'User'}
+                </h2>
+                <p className="text-white/80">{user.email || 'royalshikher@gmail.com'}</p>
                 <span className="inline-block mt-2 px-3 py-1 bg-white/20 rounded-full text-sm capitalize">
                   {profile?.role || 'citizen'}
                 </span>
@@ -251,13 +261,7 @@ export default function ProfileApp() {
             </div>
           </div>
 
-          {/* Sign Out */}
-          <button
-            onClick={signOut}
-            className="w-full py-3 bg-red-500/10 text-red-500 rounded-lg font-semibold hover:bg-red-500/20 transition-colors"
-          >
-            Sign Out
-          </button>
+          {/* Sign Out removed - demo mode */}
         </div>
       </div>
     </div>

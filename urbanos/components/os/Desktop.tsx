@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Home, ArrowLeft, AlertTriangle, Users, Map, Shield, User, Bell, Siren, Wind, ShieldCheck } from 'lucide-react';
+import { Home, ArrowLeft, AlertTriangle, Users, Map, Shield, User, Bell, Siren, Wind, ShieldCheck, Bot } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import SettingsButton from './SettingsButton';
 import WeatherDisplay from './WeatherDisplay';
@@ -34,7 +34,8 @@ const desktopIcons: DesktopIcon[] = [
   { id: 'alerts', icon: Siren, label: 'Alerts', color: 'from-orange-500 to-red-500', position: { x: 14, y: 30 } },
   { id: 'pollution', icon: Wind, label: 'Pollution', color: 'from-cyan-500 to-teal-500', position: { x: 14, y: 45 } },
   { id: 'admin', icon: ShieldCheck, label: 'Admin', color: 'from-red-600 to-red-800', position: { x: 14, y: 60 } },
-  { id: 'profile', icon: User, label: 'Profile', color: 'from-gray-500 to-gray-700', position: { x: 8, y: 75 } },
+  { id: 'chat', icon: Bot, label: 'Nagar Mitra', color: 'from-green-500 to-emerald-500', position: { x: 8, y: 75 } },
+  { id: 'profile', icon: User, label: 'Profile', color: 'from-gray-500 to-gray-700', position: { x: 14, y: 75 } },
 ];
 
 export default function Desktop() {
@@ -48,9 +49,9 @@ export default function Desktop() {
       <MapBackground dataView={dataView} activeApp={activeApp} />
 
       {/* Data Visualization Navbar */}
-      <DataVisualizationNavbar 
-        currentView={dataView} 
-        onViewChange={setDataView} 
+      <DataVisualizationNavbar
+        currentView={dataView}
+        onViewChange={setDataView}
       />
 
       {/* Return to Home Button - Neo-Brutalism */}
@@ -110,14 +111,13 @@ export default function Desktop() {
               <div className="flex flex-col items-center gap-2 p-2">
                 {/* Icon */}
                 <motion.div
-                  className={`w-16 h-16 rounded-none flex items-center justify-center border-4 border-black bg-gradient-to-br ${
-                    isSelected ? icon.color : icon.color
-                  }`}
+                  className={`w-16 h-16 rounded-none flex items-center justify-center border-4 border-black bg-gradient-to-br ${isSelected ? icon.color : icon.color
+                    }`}
                   style={{
                     boxShadow: isSelected ? '8px 8px 0px 0px rgba(0, 0, 0, 1)' : '6px 6px 0px 0px rgba(0, 0, 0, 1)',
                   }}
-                  whileHover={{ 
-                    rotate: 5, 
+                  whileHover={{
+                    rotate: 5,
                     scale: 1.05,
                     boxShadow: '8px 8px 0px 0px rgba(0, 0, 0, 1)',
                   }}
@@ -163,16 +163,13 @@ export default function Desktop() {
               priority
             />
           </div>
-          
+
           {/* Weather Display below logo - Big and Prominent (no background, just shadow) */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
             className="px-6 py-5 min-w-[180px]"
-            style={{
-              filter: 'drop-shadow(0 8px 24px rgba(0, 0, 0, 0.2)) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15))',
-            }}
           >
             <WeatherDisplay />
           </motion.div>

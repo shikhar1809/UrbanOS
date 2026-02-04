@@ -1,7 +1,7 @@
 'use client';
 
 import AppWindow from '@/components/os/AppWindow';
-import { FileText, Users, TrendingUp, ShieldCheck, UserCircle, Bell, Megaphone, Wind, Shield } from 'lucide-react';
+import { FileText, Users, TrendingUp, ShieldCheck, UserCircle, Bell, Megaphone, Wind, Shield, Bot } from 'lucide-react';
 
 // Placeholder app components (will be replaced with actual apps)
 import ReportsApp from '@/components/apps/ReportsApp';
@@ -13,6 +13,9 @@ import NotificationsApp from '@/components/apps/NotificationsApp';
 import AlertsApp from '@/components/apps/AlertsApp';
 import PollutionApp from '@/components/apps/PollutionApp';
 import AdminPanel from '@/components/apps/AdminPanel';
+import UrbanMindApp from '@/components/apps/UrbanMindApp';
+import CityMonitorApp from '@/components/apps/CityMonitorApp';
+import { Globe } from 'lucide-react';
 
 export default function OSPage() {
   return (
@@ -96,6 +99,24 @@ export default function OSPage() {
         icon={<Bell className="w-5 h-5 text-windows-blue" />}
       >
         <NotificationsApp />
+      </AppWindow>
+
+      {/* Chat App (Nagar Mitra) */}
+      <AppWindow
+        appId="chat"
+        title="UrbanMind AI"
+        icon={<Bot className="w-5 h-5 text-indigo-500" />}
+      >
+        <UrbanMindApp />
+      </AppWindow>
+
+      {/* City Monitor 3D */}
+      <AppWindow
+        appId="monitor"
+        title="UrbanVision 3D"
+        icon={<Globe className="w-5 h-5 text-indigo-500" />}
+      >
+        <CityMonitorApp />
       </AppWindow>
     </>
   );

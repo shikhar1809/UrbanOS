@@ -110,7 +110,7 @@ export default function ImpactSphere() {
 
   return (
     <section className="section-spacing flex items-center justify-center relative overflow-hidden">
-      <motion.div 
+      <motion.div
         className="max-w-7xl w-full relative z-10"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
@@ -134,7 +134,7 @@ export default function ImpactSphere() {
               Real People, Real Impact
             </h2>
           </motion.div>
-          <motion.p 
+          <motion.p
             className="text-body-large text-black font-bold max-w-3xl mx-auto bg-white neo-border px-8 py-5 rounded-lg leading-relaxed"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -189,17 +189,17 @@ export default function ImpactSphere() {
                         className={`bg-white neo-border p-5 rounded-lg w-[260px]`}
                       >
                         {/* Avatar with colored background */}
-                        <div 
+                        <div
                           className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-4 neo-border"
                           style={{ backgroundColor: testimonial.color }}
                         >
                           {testimonial.avatar}
                         </div>
-                        
+
                         {/* Content */}
                         <h3 className="font-black text-xl text-black mb-1 uppercase tracking-tight">{testimonial.name}</h3>
                         <p className="text-sm font-bold mb-3" style={{ color: testimonial.color }}>{testimonial.role}</p>
-                        
+
                         <div className="border-t-4 border-black pt-3">
                           <p className="text-sm font-bold text-black mb-2">{testimonial.story}</p>
                           {selectedCard === testimonial.id && (
@@ -219,7 +219,7 @@ export default function ImpactSphere() {
               })}
             </div>
           </div>
-          
+
           <motion.p
             className="text-center text-black font-bold text-sm bg-white neo-border px-6 py-3 rounded-lg inline-block"
             initial={{ opacity: 0 }}
@@ -232,66 +232,7 @@ export default function ImpactSphere() {
           </motion.p>
         </div>
 
-        {/* Stats Grid */}
-        <motion.div
-          className="grid grid-cols-2 md:grid-cols-4 gap-6"
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true }}
-        >
-            <motion.div 
-              className="text-center neo-border p-8 rounded-lg interactive-element"
-              style={{ backgroundColor: '#7FDBDB' }}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, type: "spring" }}
-              viewport={{ once: true }}
-              whileHover={{ scale: 1.08, rotate: -2 }}
-            >
-              <div className="text-5xl md:text-6xl font-black text-black mb-3">98%</div>
-              <div className="text-black font-bold uppercase text-sm md:text-base tracking-wide">Satisfaction</div>
-            </motion.div>
 
-            <motion.div 
-              className="text-center neo-border p-8 rounded-lg interactive-element"
-              style={{ backgroundColor: '#E85D75' }}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, type: "spring" }}
-              viewport={{ once: true }}
-              whileHover={{ scale: 1.08, rotate: 2 }}
-            >
-              <div className="text-5xl md:text-6xl font-black text-white mb-3">15K+</div>
-              <div className="text-white font-bold uppercase text-sm md:text-base tracking-wide">Active Users</div>
-            </motion.div>
-
-            <motion.div 
-              className="text-center neo-border p-8 rounded-lg interactive-element"
-              style={{ backgroundColor: '#B8D96D' }}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, type: "spring" }}
-              viewport={{ once: true }}
-              whileHover={{ scale: 1.08, rotate: -2 }}
-            >
-              <div className="text-5xl md:text-6xl font-black text-black mb-3">72h</div>
-              <div className="text-black font-bold uppercase text-sm md:text-base tracking-wide">Avg Resolution</div>
-            </motion.div>
-
-            <motion.div 
-              className="text-center neo-border p-8 rounded-lg interactive-element"
-              style={{ backgroundColor: '#5B8BD6' }}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, type: "spring" }}
-              viewport={{ once: true }}
-              whileHover={{ scale: 1.08, rotate: 2 }}
-            >
-              <div className="text-5xl md:text-6xl font-black text-white mb-3">24/7</div>
-              <div className="text-white font-bold uppercase text-sm md:text-base tracking-wide">Support</div>
-            </motion.div>
-        </motion.div>
       </motion.div>
     </section>
   );
