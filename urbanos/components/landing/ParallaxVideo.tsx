@@ -3,7 +3,6 @@
 import { ContainerScroll } from '@/components/ui/container-scroll-animation';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface ParallaxVideoProps {
   className?: string;
@@ -44,24 +43,19 @@ export default function ParallaxVideo({
         }
       >
         <div className="relative w-full h-full rounded-lg overflow-hidden bg-gray-900">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentImageIndex}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.8 }}
-              className="absolute inset-0 w-full h-full"
-            >
+          <div className="absolute inset-0 w-full h-full">
+            {images.map((img, index) => (
               <Image
-                src={images[currentImageIndex]}
-                alt={`UrbanOS Interface Slide ${currentImageIndex + 1}`}
+                key={img}
+                src={img}
+                alt={`UrbanOS Interface Slide ${index + 1}`}
                 fill
-                className="w-full h-full object-cover object-center"
-                priority={currentImageIndex === 0}
+                className={`w-full h-full object-cover object-center transition-none ${index === currentImageIndex ? 'visible z-10' : 'invisible z-0'
+                  }`}
+                priority={index === 0}
               />
-            </motion.div>
-          </AnimatePresence>
+            ))}
+          </div>
 
           {/* Overlay gradient for better visibility */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
@@ -73,8 +67,8 @@ export default function ParallaxVideo({
                 key={index}
                 onClick={() => setCurrentImageIndex(index)}
                 className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentImageIndex
-                    ? 'bg-white w-6'
-                    : 'bg-white/50 hover:bg-white/80'
+                  ? 'bg-white w-6'
+                  : 'bg-white/50 hover:bg-white/80'
                   }`}
                 aria-label={`Go to slide ${index + 1}`}
               />
