@@ -2,14 +2,33 @@
 
 import { ContainerScroll } from '@/components/ui/container-scroll-animation';
 import Image from 'next/image';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ParallaxVideoProps {
   className?: string;
 }
 
+const images = [
+  "/urbanos-interface.png",
+  "/urbanos-slide-1.png",
+  "/urbanos-slide-2.png",
+  "/urbanos-slide-3.png"
+];
+
 export default function ParallaxVideo({
   className = ''
 }: ParallaxVideoProps) {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % images.length);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className={`relative w-full ${className}`}>
       <ContainerScroll
@@ -24,14 +43,44 @@ export default function ParallaxVideo({
           </div>
         }
       >
-        <Image
-          src="/urbanos-interface.png"
-          alt="UrbanOS Interface"
-          width={1920}
-          height={1080}
-          className="w-full h-full object-cover object-center rounded-lg"
-          priority
-        />
+        <div className="relative w-full h-full rounded-lg overflow-hidden bg-gray-900">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentImageIndex}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.8 }}
+              className="absolute inset-0 w-full h-full"
+            >
+              <Image
+                src={images[currentImageIndex]}
+                alt={`UrbanOS Interface Slide ${currentImageIndex + 1}`}
+                fill
+                className="w-full h-full object-cover object-center"
+                priority={currentImageIndex === 0}
+              />
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Overlay gradient for better visibility */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
+
+          {/* Slide indicators */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+            {images.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentImageIndex(index)}
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentImageIndex
+                    ? 'bg-white w-6'
+                    : 'bg-white/50 hover:bg-white/80'
+                  }`}
+                aria-label={`Go to slide ${index + 1}`}
+              />
+            ))}
+          </div>
+        </div>
       </ContainerScroll>
     </div>
   );
